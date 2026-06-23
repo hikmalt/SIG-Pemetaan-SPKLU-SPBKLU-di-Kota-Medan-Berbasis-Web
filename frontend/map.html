@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<!-- FILE: frontend/map.html -->
+<!-- Peta Interaktif SPKLU & SPBKLU Medan — Leaflet + PostGIS -->
+<!-- Hikmal Akbar | 2305181024 | Teknologi Rekayasa Perangkat Lunak -->
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Peta Interaktif — SIG EV Station Medan</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <!-- Leaflet MarkerCluster -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css" />
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ============================================================
+       BASE
+    ============================================================ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --green:  #22c55e; --green-d: #16a34a; --blue: #3b82f6;
+      --dark:   #0a0f1e; --dark2:  #111827;  --dark3: #1f2937;
+      --card:   #1a2235; --text:   #f1f5f9;  --muted: #94a3b8;
+      --border: rgba(255,255,255,0.08);
+      --radius: 12px;
+      --sidebar-w: 320px;
+      --ff: 'Inter', sans-serif;
+      --ff-h: 'Space Grotesk', sans-serif;
+    }
+    html, body { height: 100%; overflow: hidden; font-family: var(--ff); background: var(--dark); color: var(--text); cursor: default; }
+
+    /* ============================================================
+       LAYOUT
+    ============================================================ */
+    #app { display: flex; height: 100vh; overflow: hidden; }
+
+    /* ============================================================
+       SIDEBAR
+    ============================================================ */
+    #sidebar {
+      width: var(--sidebar-w); flex-shrink: 0;
+      background: var(--dark2); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; overflow: hidden;
+      z-index: 500; transition: transform 0.3s;
+    }
+    #sidebar.collapsed { transform: translateX(calc(-1 * var(--sidebar-w))); }
+
+    .sidebar-header {
+      padding: 16px 18px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    }
+    .sidebar-logo { font-family: var(--ff-h); font-weight: 700; font-size: 1rem; color: var(--green); }
+
+    .sidebar-body { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 14px; }
+    .sidebar-body::-webkit-scrollbar { width: 4px; }
+    .sidebar-body::-webkit-scrollbar-track { background: transparent; }
+    .sidebar-body::-webkit-scrollbar-thumb { background: var(--dark3); border-radius: 4px; }
+
+    /* Search */
+    .search-wrap { position: relative; }
+    .search-wrap input {
+      width: 100%; padding: 10px 14px 10px 38px;
+      background: var(--dark3); border: 1px solid var(--border);
+      border-radius: 10px; color: var(--text); font-size: 0.85rem;
+      outline: none; transition: border-color 0.2s;
+    }
+    .search-wrap input:focus { border-color: rgba(34,197,94,0.4); }
+    .search-wrap .search-icon {
+      position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+      color: var(--muted); pointer-events: none;
+    }
+    .search-dropdown {
+      position: absolute; top: 100%; left: 0; right: 0; z-index: 100;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 10px; margin-top: 4px; overflow: hidden;
+      display: none; max-height: 220px; overflow-y: auto;
+    }
+    .search-dropdown.show { display: block; }
+    .search-dropdown-item {
+      padding: 10px 14px; cursor: pointer; font-size: 0.82rem;
+      border-bottom: 1px solid var(--border); transition: background 0.15s;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .search-dropdown-item:hover { background: var(--dark3); }
+    .search-dropdown-item .badge {
+      padding: 2px 7px; border-radius: 99px; font-size: 0.7rem; font-weight: 600;
+    }
+    .badge-spklu  { background: rgba(34,197,94,0.15); color: var(--green); }
+    .badge-spbklu { background: rgba(59,130,246,0.15); color: var(--blue); }
+
+    /* Filter panel */
+    .panel { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .panel-head {
+      padding: 11px 14px; font-size: 0.82rem; font-weight: 600;
+      color: var(--muted); display: flex; align-items: center; justify-content: space-between;
+      cursor: pointer; user-select: none;
+      border-bottom: 1px solid var(--border);
+    }
+    .panel-head:hover { color: var(--text); }
+    .panel-body { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+    .panel-body.hidden { display: none; }
+
+    label.field-label { font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; display: block; }
+    select, input[type=range] {
+      width: 100%; background: var(--dark3); border: 1px solid var(--border);
+      color: var(--text); border-radius: 8px; padding: 8px 10px; font-size: 0.82rem;
+      outline: none;
+    }
+    input[type=range] { padding: 4px 0; cursor: pointer; }
+    .range-val { font-size: 0.75rem; color: var(--green); text-align: right; }
+
+    /* Chip buttons */
+    .chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip {
+      padding: 5px 12px; border-radius: 99px; font-size: 0.75rem; font-weight: 600;
+      border: 1px solid var(--border); background: var(--dark3);
+      color: var(--muted); cursor: pointer; transition: all 0.15s;
+    }
+    .chip.active { background: var(--green); color: #000; border-color: var(--green); }
+    .chip.active.blue { background: var(--blue); border-color: var(--blue); color: #fff; }
+
+    /* Action buttons */
+    .btn-full {
+      width: 100%; padding: 10px; border-radius: 10px; border: none;
+      font-size: 0.85rem; font-weight: 600; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      transition: transform 0.15s, opacity 0.15s;
+    }
+    .btn-full:hover { transform: scale(1.02); }
+    .btn-full:active { transform: scale(0.98); }
+    .btn-green  { background: var(--green); color: #000; }
+    .btn-blue   { background: var(--blue);  color: #fff; }
+    .btn-outline-sm {
+      background: none; border: 1px solid var(--border); color: var(--muted);
+    }
+    .btn-outline-sm:hover { border-color: var(--green); color: var(--green); }
+
+    /* Result list */
+    .result-item {
+      padding: 10px 12px; border-radius: 10px;
+      border: 1px solid var(--border); background: var(--dark3);
+      cursor: pointer; transition: border-color 0.15s;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .result-item:hover { border-color: rgba(34,197,94,0.4); }
+    .result-item .icon { width:36px; height:36px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:1.1rem; flex-shrink:0; }
+    .result-item .info h4 { font-size:0.82rem; font-weight:600; line-height:1.3; }
+    .result-item .info p  { font-size:0.72rem; color:var(--muted); }
+    .jarak-badge { margin-left:auto; font-size:0.7rem; color:var(--green); white-space:nowrap; flex-shrink:0; }
+
+    /* User info bar */
+    .user-bar {
+      padding: 10px 14px; border-top: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px; font-size: 0.8rem;
+    }
+    .user-bar img { width:28px; height:28px; border-radius:50%; }
+    .user-bar .name { font-weight: 600; }
+    .user-bar .role { color: var(--green); font-size: 0.7rem; }
+    .user-bar a {
+      margin-left: auto; font-size: 0.75rem; color: var(--muted);
+      text-decoration: none; transition: color 0.2s;
+    }
+    .user-bar a:hover { color: var(--text); }
+
+    /* ============================================================
+       MAP CONTAINER
+    ============================================================ */
+    #map-wrap { flex: 1; position: relative; }
+    #map { width: 100%; height: 100%; }
+
+    /* Toggle sidebar button (mobile) */
+    #sidebar-toggle {
+      position: absolute; top: 14px; left: 14px; z-index: 600;
+      background: var(--card); border: 1px solid var(--border);
+      width: 40px; height: 40px; border-radius: 10px;
+      display: none; align-items: center; justify-content: center;
+      cursor: pointer; font-size: 1.1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+
+    /* Map controls overlay */
+    .map-fab {
+      position: absolute; z-index: 400;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .map-fab.top-right { top: 14px; right: 14px; }
+    .map-fab.bottom-right { bottom: 36px; right: 14px; }
+
+    .fab {
+      width: 44px; height: 44px; border-radius: 12px;
+      background: var(--card); border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; font-size: 1.1rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      transition: transform 0.2s, background 0.2s;
+      position: relative;
+    }
+    .fab:hover { transform: scale(1.08); background: var(--dark3); }
+    .fab.active { background: var(--green); border-color: var(--green); color: #000; }
+    .fab-tip {
+      position: absolute; right: 52px; top: 50%; transform: translateY(-50%);
+      background: var(--card); border: 1px solid var(--border);
+      padding: 4px 10px; border-radius: 6px; font-size: 0.72rem; white-space: nowrap;
+      pointer-events: none; opacity: 0; transition: opacity 0.15s;
+    }
+    .fab:hover .fab-tip { opacity: 1; }
+
+    /* Legend */
+    .map-legend {
+      position: absolute; bottom: 36px; left: 14px; z-index: 400;
+      background: rgba(17,24,39,0.9); backdrop-filter: blur(8px);
+      border: 1px solid var(--border); border-radius: 12px;
+      padding: 12px 14px; font-size: 0.75rem;
+    }
+    .map-legend h4 { font-weight: 600; margin-bottom: 8px; color: var(--text); }
+    .leg-item { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; color: var(--muted); }
+    .leg-dot  { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+    /* Info box (hasil analisis) */
+    .info-box {
+      position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+      z-index: 500; background: rgba(17,24,39,0.9); backdrop-filter: blur(8px);
+      border: 1px solid var(--border); border-radius: 12px;
+      padding: 10px 18px; font-size: 0.82rem; color: var(--text);
+      display: none; white-space: nowrap; pointer-events: none;
+    }
+    .info-box.show { display: block; }
+
+    /* Leaflet custom popup */
+    .leaflet-popup-content-wrapper {
+      background: var(--card) !important; color: var(--text) !important;
+      border: 1px solid var(--border) !important; border-radius: 14px !important;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5) !important;
+    }
+    .leaflet-popup-tip { background: var(--card) !important; }
+    .popup-inner { min-width: 220px; }
+    .popup-inner img { width:100%; height:110px; object-fit:cover; border-radius:10px; margin-bottom:10px; }
+    .popup-inner h3 { font-size:0.9rem; font-weight:700; margin-bottom:4px; }
+    .popup-inner .addr { font-size:0.75rem; color:var(--muted); margin-bottom:8px; line-height:1.4; }
+    .popup-inner .tags { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
+    .popup-inner .tag {
+      padding:2px 8px; border-radius:99px; font-size:0.7rem; font-weight:600;
+    }
+    .tag-spklu  { background:rgba(34,197,94,0.15); color:var(--green); }
+    .tag-spbklu { background:rgba(59,130,246,0.15); color:var(--blue); }
+    .tag-status { background:rgba(255,255,255,0.07); color:var(--muted); }
+    .popup-btns { display:flex; gap:8px; }
+    .popup-btns a {
+      flex:1; padding:7px; border-radius:8px; text-align:center;
+      font-size:0.75rem; font-weight:600; text-decoration:none;
+      transition:opacity 0.15s;
+    }
+    .popup-btns a:hover { opacity:0.85; }
+    .popup-btn-detail { background:var(--green); color:#000; }
+    .popup-btn-nav    { background:var(--dark3); color:var(--text); }
+
+    /* Skeleton */
+    .skeleton { background: linear-gradient(90deg, var(--dark3) 25%, var(--card) 50%, var(--dark3) 75%); background-size:200% 100%; animation:shimmer 1.5s infinite; border-radius:8px; }
+    @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+    /* Toast */
+    #toast-map { position:absolute; top:14px; right:64px; z-index:600; display:flex; flex-direction:column; gap:8px; }
+    .toast-m { padding:10px 16px; background:var(--card); border:1px solid var(--border); border-radius:10px; font-size:0.8rem; animation:slide-t 0.3s ease; }
+    @keyframes slide-t { from{opacity:0;transform:translateY(-10px)} to{opacity:1;transform:translateY(0)} }
+
+    /* ============================================================
+       RESPONSIVE
+    ============================================================ */
+    @media (max-width: 768px) {
+      #sidebar { position:absolute; top:0; left:0; bottom:0; z-index:600; }
+      #sidebar.collapsed { transform:translateX(-100%); }
+      #sidebar-toggle { display:flex; }
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ============================================================
+       SIDEBAR
+  ============================================================ -->
+  <aside id="sidebar">
+    <!-- Header -->
+    <div class="sidebar-header">
+      <a href="index.html" class="sidebar-logo" style="text-decoration:none">⚡ EV Station Medan</a>
+      <button id="sidebar-close" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.2rem">✕</button>
+    </div>
+
+    <div class="sidebar-body">
+
+      <!-- Search -->
+      <div class="search-wrap">
+        <svg class="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+        <input type="text" id="search-input" placeholder="Cari nama stasiun..." autocomplete="off" />
+        <div class="search-dropdown" id="search-dropdown"></div>
+      </div>
+
+      <!-- Tombol lokasi & cari terdekat -->
+      <button class="btn-full btn-green" id="btn-my-location">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/>
+        </svg>
+        Lokasi Saya
+      </button>
+
+      <button class="btn-full btn-blue" id="btn-nearest" disabled>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>
+        </svg>
+        Cari 5 Terdekat
+      </button>
+
+      <!-- Filter Panel -->
+      <div class="panel">
+        <div class="panel-head" data-toggle="filter-body">
+          <span>🔍 Filter Stasiun</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+        <div class="panel-body" id="filter-body">
+
+          <!-- Jenis -->
+          <div>
+            <label class="field-label">Jenis Stasiun</label>
+            <div class="chip-row">
+              <div class="chip active" data-jenis="ALL">Semua</div>
+              <div class="chip" data-jenis="SPKLU">SPKLU</div>
+              <div class="chip blue" data-jenis="SPBKLU">SPBKLU</div>
+            </div>
+          </div>
+
+          <!-- Tipe Charger -->
+          <div>
+            <label class="field-label">Tipe Charger (SPKLU)</label>
+            <select id="sel-tipe">
+              <option value="">Semua Tipe</option>
+              <option value="Ultra Fast">Ultra Fast (>50 kW)</option>
+              <option value="Fast">Fast Charging (22–50 kW)</option>
+              <option value="Medium">Medium (7–22 kW)</option>
+              <option value="Slow">Slow (<7 kW)</option>
+            </select>
+          </div>
+
+          <!-- Radius -->
+          <div>
+            <label class="field-label">Radius pencarian</label>
+            <input type="range" id="range-radius" min="500" max="10000" step="500" value="2000" />
+            <div class="range-val" id="radius-val">2.0 km</div>
+          </div>
+
+          <button class="btn-full btn-green" id="btn-apply-filter">Terapkan Filter</button>
+          <button class="btn-full btn-outline-sm" id="btn-reset-filter">Reset</button>
+        </div>
+      </div>
+
+      <!-- Layer Panel -->
+      <div class="panel">
+        <div class="panel-head" data-toggle="layer-body">
+          <span>🗂️ Layer Peta</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+        <div class="panel-body hidden" id="layer-body">
+          <label style="display:flex;align-items:center;gap:8px;font-size:0.82rem;cursor:pointer">
+            <input type="checkbox" id="chk-kecamatan" checked style="width:auto"> Batas Kecamatan
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:0.82rem;cursor:pointer">
+            <input type="checkbox" id="chk-cluster" checked style="width:auto"> Cluster Marker
+          </label>
+          <button class="btn-full btn-outline-sm" id="btn-buffer">⭕ Buffer 1km Stasiun Dipilih</button>
+        </div>
+      </div>
+
+      <!-- Hasil terdekat -->
+      <div id="result-panel" style="display:none">
+        <div style="font-size:0.78rem;color:var(--muted);margin-bottom:8px;font-weight:600" id="result-title">Stasiun Terdekat</div>
+        <div id="result-list" style="display:flex;flex-direction:column;gap:6px"></div>
+      </div>
+
+    </div><!-- end sidebar-body -->
+
+    <!-- User bar -->
+    <div class="user-bar" id="user-bar">
+      <span style="color:var(--muted);font-size:0.8rem">Belum login</span>
+      <a href="login.html" style="margin-left:auto">🔐 Login</a>
+    </div>
+  </aside>
+
+  <!-- ============================================================
+       MAP AREA
+  ============================================================ -->
+  <div id="map-wrap">
+    <!-- Toggle sidebar (mobile) -->
+    <button id="sidebar-toggle">☰</button>
+
+    <!-- Map -->
+    <div id="map"></div>
+
+    <!-- FABs top-right -->
+    <div class="map-fab top-right">
+      <div class="fab" id="fab-home" title="">
+        🏠<span class="fab-tip">Pusat Kota Medan</span>
+      </div>
+      <div class="fab" id="fab-satellite" title="">
+        🛰️<span class="fab-tip">Ganti Basemap</span>
+      </div>
+      <div class="fab" id="fab-fullscreen" title="">
+        ⛶<span class="fab-tip">Fullscreen</span>
+      </div>
+    </div>
+
+    <!-- FABs bottom-right -->
+    <div class="map-fab bottom-right">
+      <div class="fab" id="fab-add" title="">
+        ➕<span class="fab-tip">Tambah Stasiun</span>
+      </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="map-legend">
+      <h4>Legenda</h4>
+      <div class="leg-item"><div class="leg-dot" style="background:#22c55e"></div> SPKLU (Pengisian)</div>
+      <div class="leg-item"><div class="leg-dot" style="background:#3b82f6"></div> SPBKLU (Swap Baterai)</div>
+      <div class="leg-item"><div class="leg-dot" style="background:rgba(99,102,241,0.5);border:1px dashed #818cf8"></div> Batas Kecamatan</div>
+    </div>
+
+    <!-- Info box -->
+    <div class="info-box" id="info-box"></div>
+
+    <!-- Toast -->
+    <div id="toast-map"></div>
+  </div>
+
+</div><!-- end #app -->
+
+<!-- Leaflet JS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js"></script>
+
+<script>
+// ============================================================
+// FILE: frontend/map.html (inline script)
+// Peta Interaktif SIG EV Station Medan
+// Hikmal Akbar | 2305181024
+// ============================================================
+
+const API_BASE   = 'http://localhost:3000/api';
+const MEDAN_CENTER = [3.5952, 98.6722]; // Lapangan Merdeka Medan
+
+// ── State ───────────────────────────────────────────────────
+let map, markerLayer, kecamatanLayer, userMarker, bufferCircle;
+let allStasiun   = [];
+let userLatLon   = null;
+let activeJenis  = 'ALL';
+let useSatellite = false;
+let useCluster   = true;
+let selectedStasiunId = null;
+
+// ── Tile Layers ─────────────────────────────────────────────
+const tileOSM = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap contributors', maxZoom: 19
+});
+const tileSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  attribution: '© Esri World Imagery', maxZoom: 19
+});
+
+// ============================================================
+// INIT MAP
+// ============================================================
+function initMap() {
+  map = L.map('map', {
+    center: MEDAN_CENTER, zoom: 13,
+    zoomControl: false,
+    layers: [tileOSM]
+  });
+
+  // Zoom control di kanan
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+  // Layer markers (default: cluster)
+  markerLayer = L.markerClusterGroup({
+    chunkedLoading: true,
+    maxClusterRadius: 50
+  });
+  map.addLayer(markerLayer);
+
+  // Load data
+  loadAllStasiun();
+  loadKecamatan();
+}
+
+// ============================================================
+// LOAD STASIUN
+// ============================================================
+async function loadAllStasiun(params = {}) {
+  showInfoBox('⏳ Memuat data stasiun...');
+  try {
+    const qp = new URLSearchParams(params).toString();
+    const res = await fetch(`${API_BASE}/stasiun?limit=500${qp ? '&' + qp : ''}`);
+    const json = await res.json();
+
+    if (!json.success) throw new Error('Gagal memuat data');
+
+    allStasiun = json.features || [];
+    renderMarkers(allStasiun);
+    showInfoBox(`✅ ${allStasiun.length} stasiun dimuat`, 2000);
+
+    // Isi search autocomplete
+    buildSearchIndex(allStasiun);
+  } catch (err) {
+    showInfoBox('❌ Gagal memuat stasiun — cek koneksi API', 3000);
+    renderFallbackMarkers(); // Tampilkan marker demo
+  }
+}
+
+// Fallback data demo jika API tidak bisa diakses
+function renderFallbackMarkers() {
+  const demo = [
+    { nama:'SPKLU PLN Medan Baru', jenis:'SPKLU', latitude:3.591969, longitude:98.666245, alamat:'Jl. Listrik No.1, Medan Baru', status:'Beroperasi', id:1 },
+    { nama:'SPKLU Sun Plaza', jenis:'SPKLU', latitude:3.587362, longitude:98.669987, alamat:'Jl. KH Zainul Arifin, Medan Petisah', status:'Beroperasi', id:2 },
+    { nama:'SPBKLU Alfamart Gatot', jenis:'SPBKLU', latitude:3.584912, longitude:98.650123, alamat:'Jl. Gatot Subroto No.100', status:'Beroperasi', id:25 },
+    { nama:'SPKLU Cambridge Square', jenis:'SPKLU', latitude:3.593450, longitude:98.659712, alamat:'Jl. S. Parman No.217', status:'Beroperasi', id:4 },
+    { nama:'SPBKLU PLN UP3', jenis:'SPBKLU', latitude:3.591200, longitude:98.662300, alamat:'Jl. Listrik No.8, Petisah', status:'Beroperasi', id:37 },
+  ];
+  allStasiun = demo.map(d => ({
+    type:'Feature', geometry:{type:'Point',coordinates:[d.longitude,d.latitude]},
+    properties:d
+  }));
+  renderMarkers(allStasiun);
+  showInfoBox('⚠️ Mode demo — koneksi API tidak tersedia', 4000);
+}
+
+// ============================================================
+// RENDER MARKERS
+// ============================================================
+function renderMarkers(features) {
+  markerLayer.clearLayers();
+  if (bufferCircle) { map.removeLayer(bufferCircle); bufferCircle = null; }
+
+  features.forEach(feature => {
+    const p   = feature.properties || feature;
+    const lat = p.latitude  || feature.geometry?.coordinates[1];
+    const lon = p.longitude || feature.geometry?.coordinates[0];
+    if (!lat || !lon) return;
+
+    const isSpklu  = p.jenis === 'SPKLU';
+    const color    = isSpklu ? '#22c55e' : '#3b82f6';
+    const emoji    = isSpklu ? '⚡' : '🔋';
+
+    // Custom icon SVG inline
+    const icon = L.divIcon({
+      className: '',
+      iconSize: [36, 44],
+      iconAnchor: [18, 44],
+      popupAnchor: [0, -44],
+      html: `<svg width="36" height="44" viewBox="0 0 36 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M18 0C8.06 0 0 8.06 0 18c0 13.5 18 26 18 26s18-12.5 18-26C36 8.06 27.94 0 18 0z" fill="${color}"/>
+        <circle cx="18" cy="18" r="10" fill="rgba(0,0,0,0.2)"/>
+        <text x="18" y="23" text-anchor="middle" font-size="12" fill="white">${emoji}</text>
+      </svg>`
+    });
+
+    const marker = L.marker([lat, lon], { icon });
+
+    // Popup content
+    const popup = L.popup({ maxWidth: 260 }).setContent(`
+      <div class="popup-inner">
+        <img src="${p.foto_stasiun_url || 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=220&fit=crop'}"
+             alt="${p.nama}" onerror="this.src='https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=220&fit=crop'">
+        <h3>${p.nama}</h3>
+        <p class="addr">📍 ${p.alamat || '-'}</p>
+        <div class="tags">
+          <span class="tag tag-${(p.jenis||'').toLowerCase()}">${p.jenis}</span>
+          <span class="tag tag-status">🟢 ${p.status || 'Beroperasi'}</span>
+        </div>
+        <div class="popup-btns">
+          <a href="stasiun.html?id=${p.id}" class="popup-btn-detail">Detail</a>
+          <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}" target="_blank" class="popup-btn-nav">🗺️ Navigasi</a>
+        </div>
+      </div>
+    `);
+
+    marker.bindPopup(popup);
+    marker.on('click', () => {
+      selectedStasiunId = p.id;
+      selectedLat = lat; selectedLon = lon;
+    });
+
+    markerLayer.addLayer(marker);
+  });
+}
+
+// ============================================================
+// LOAD KECAMATAN POLYGON
+// ============================================================
+async function loadKecamatan() {
+  try {
+    const res  = await fetch(`${API_BASE}/report/geojson-kecamatan`);
+    const json = await res.json();
+
+    kecamatanLayer = L.geoJSON(json, {
+      style: feat => ({
+        color: '#6366f1', weight: 1.5, opacity: 0.6,
+        fillColor: '#6366f1',
+        fillOpacity: feat.properties.jumlah_stasiun > 0 ? 0.06 : 0.02
+      }),
+      onEachFeature: (feat, layer) => {
+        const p = feat.properties;
+        layer.bindTooltip(
+          `<strong>${p.nama_kecamatan}</strong><br>🏭 ${p.jumlah_stasiun} stasiun (${p.spklu} SPKLU, ${p.spbklu} SPBKLU)`,
+          { sticky: true, className: 'kec-tooltip' }
+        );
+        layer.on('click', () => {
+          showToast(`${p.nama_kecamatan}: ${p.jumlah_stasiun} stasiun`);
+        });
+      }
+    });
+
+    if (document.getElementById('chk-kecamatan').checked) {
+      map.addLayer(kecamatanLayer);
+    }
+  } catch (_) {
+    // Kecamatan tidak tersedia — lanjutkan tanpa layer ini
+  }
+}
+
+// ============================================================
+// FILTER & CONTROLS
+// ============================================================
+
+// Jenis chip filter
+document.querySelectorAll('[data-jenis]').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('[data-jenis]').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    activeJenis = chip.dataset.jenis;
+  });
+});
+
+// Radius slider
+const rangeRadius = document.getElementById('range-radius');
+const rangeVal    = document.getElementById('radius-val');
+rangeRadius.addEventListener('input', () => {
+  rangeVal.textContent = (rangeRadius.value / 1000).toFixed(1) + ' km';
+});
+
+// Terapkan filter
+document.getElementById('btn-apply-filter').addEventListener('click', async () => {
+  const params = {};
+  if (activeJenis !== 'ALL') params.jenis = activeJenis;
+  const tipe = document.getElementById('sel-tipe').value;
+  if (tipe) params.tipe_charger = tipe;
+
+  if (userLatLon && rangeRadius.value < 10000) {
+    // Filter by radius
+    showInfoBox('⏳ Mencari dalam radius...');
+    try {
+      const radius = rangeRadius.value;
+      const url = `${API_BASE}/stasiun/within-radius?lat=${userLatLon.lat}&lon=${userLatLon.lon}&radius_m=${radius}${activeJenis !== 'ALL' ? '&jenis='+activeJenis : ''}`;
+      const res  = await fetch(url);
+      const json = await res.json();
+
+      const features = (json.data || []).map(d => ({
+        type:'Feature',
+        geometry:{ type:'Point', coordinates:[d.longitude, d.latitude] },
+        properties: d
+      }));
+      renderMarkers(features);
+
+      // Tampilkan circle radius
+      if (bufferCircle) map.removeLayer(bufferCircle);
+      bufferCircle = L.circle([userLatLon.lat, userLatLon.lon], {
+        radius: parseInt(radius),
+        color: '#22c55e', weight: 2, opacity: 0.5,
+        fillColor: '#22c55e', fillOpacity: 0.05
+      }).addTo(map);
+
+      showInfoBox(`⭕ ${features.length} stasiun dalam radius ${(radius/1000).toFixed(1)}km`, 3000);
+    } catch(e) {
+      showInfoBox('❌ Gagal filter radius', 2000);
+    }
+  } else {
+    await loadAllStasiun(params);
+  }
+});
+
+// Reset filter
+document.getElementById('btn-reset-filter').addEventListener('click', () => {
+  document.querySelectorAll('[data-jenis]').forEach(c => c.classList.remove('active'));
+  document.querySelector('[data-jenis="ALL"]').classList.add('active');
+  activeJenis = 'ALL';
+  document.getElementById('sel-tipe').value = '';
+  rangeRadius.value = 2000; rangeVal.textContent = '2.0 km';
+  if (bufferCircle) { map.removeLayer(bufferCircle); bufferCircle = null; }
+  loadAllStasiun();
+});
+
+// My Location
+document.getElementById('btn-my-location').addEventListener('click', () => {
+  if (!navigator.geolocation) { showToast('Geolocation tidak didukung browser ini', 'error'); return; }
+  showInfoBox('📡 Mendeteksi lokasi...');
+  navigator.geolocation.getCurrentPosition(pos => {
+    userLatLon = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+
+    if (userMarker) map.removeLayer(userMarker);
+    userMarker = L.marker([userLatLon.lat, userLatLon.lon], {
+      icon: L.divIcon({
+        className: '',
+        iconSize: [20, 20], iconAnchor: [10, 10],
+        html: `<div style="width:20px;height:20px;border-radius:50%;background:#facc15;border:3px solid #fff;box-shadow:0 0 10px rgba(250,204,21,0.5)"></div>`
+      })
+    }).addTo(map).bindTooltip('📍 Lokasi Saya');
+
+    map.flyTo([userLatLon.lat, userLatLon.lon], 15, { duration: 1.5 });
+    document.getElementById('btn-nearest').disabled = false;
+    showInfoBox(`✅ Lokasi terdeteksi: ${userLatLon.lat.toFixed(5)}, ${userLatLon.lon.toFixed(5)}`, 2500);
+    showToast('Lokasi berhasil terdeteksi 📍', 'success');
+  }, err => {
+    showInfoBox('❌ Gagal mendapatkan lokasi', 2000);
+    showToast('Izin lokasi ditolak', 'error');
+  });
+});
+
+// ── Nearest Neighbor (PostGIS KNN) ──────────────────────────
+let selectedLat = null, selectedLon = null;
+
+document.getElementById('btn-nearest').addEventListener('click', async () => {
+  if (!userLatLon) return;
+  showInfoBox('🔍 Mencari stasiun terdekat (PostGIS KNN)...');
+  try {
+    const jFilter = activeJenis !== 'ALL' ? `&jenis=${activeJenis}` : '';
+    const url = `${API_BASE}/stasiun/nearby?lat=${userLatLon.lat}&lon=${userLatLon.lon}&limit=5${jFilter}`;
+    const res  = await fetch(url);
+    const json = await res.json();
+
+    const resultPanel = document.getElementById('result-panel');
+    const resultList  = document.getElementById('result-list');
+    const resultTitle = document.getElementById('result-title');
+
+    resultTitle.textContent = `📍 5 Stasiun Terdekat dari Lokasi Anda`;
+    resultList.innerHTML = '';
+    resultPanel.style.display = 'block';
+
+    if (!json.data?.length) {
+      resultList.innerHTML = '<div style="color:var(--muted);font-size:0.8rem">Tidak ada stasiun ditemukan.</div>';
+      return;
+    }
+
+    json.data.forEach((s, i) => {
+      const isSpklu = s.jenis === 'SPKLU';
+      const div = document.createElement('div');
+      div.className = 'result-item';
+      div.innerHTML = `
+        <div class="icon" style="background:${isSpklu ? 'rgba(34,197,94,0.15)' : 'rgba(59,130,246,0.15)'}">
+          ${isSpklu ? '⚡' : '🔋'}
+        </div>
+        <div class="info">
+          <h4>${i+1}. ${s.nama}</h4>
+          <p>${s.provider || s.badan_usaha || '-'}</p>
+        </div>
+        <span class="jarak-badge">${s.jarak_meter >= 1000 ? (s.jarak_meter/1000).toFixed(1)+'km' : Math.round(s.jarak_meter)+'m'}</span>
+      `;
+      div.addEventListener('click', () => {
+        map.flyTo([s.latitude, s.longitude], 17, { duration: 1.2 });
+        showToast(`📍 ${s.nama} — ${Math.round(s.jarak_meter)}m dari lokasi Anda`);
+      });
+      resultList.appendChild(div);
+    });
+
+    showInfoBox(`✅ ${json.data.length} stasiun terdekat ditemukan`, 2000);
+  } catch (err) {
+    showInfoBox('❌ Gagal query nearest neighbor', 2000);
+  }
+});
+
+// ── Layer Toggles ────────────────────────────────────────────
+document.getElementById('chk-kecamatan').addEventListener('change', function() {
+  if (!kecamatanLayer) return;
+  this.checked ? map.addLayer(kecamatanLayer) : map.removeLayer(kecamatanLayer);
+});
+
+document.getElementById('chk-cluster').addEventListener('change', function() {
+  useCluster = this.checked;
+  // Re-render dengan mode cluster/individual
+  const layers = markerLayer.getLayers();
+  map.removeLayer(markerLayer);
+  markerLayer = useCluster
+    ? L.markerClusterGroup({ maxClusterRadius: 50 })
+    : L.layerGroup();
+  layers.forEach(l => markerLayer.addLayer(l));
+  map.addLayer(markerLayer);
+});
+
+// Buffer
+document.getElementById('btn-buffer').addEventListener('click', async () => {
+  if (!selectedStasiunId) { showToast('Pilih marker stasiun terlebih dahulu', 'error'); return; }
+  try {
+    const res  = await fetch(`${API_BASE}/report/buffer?stasiun_id=${selectedStasiunId}&radius_m=1000`);
+    const json = await res.json();
+    if (!json.success) throw new Error();
+    if (bufferCircle) map.removeLayer(bufferCircle);
+    const stasiun = allStasiun.find(f => (f.properties||f).id === selectedStasiunId);
+    if (stasiun) {
+      const p = stasiun.properties || stasiun;
+      bufferCircle = L.circle([p.latitude, p.longitude], {
+        radius: 1000, color:'#22c55e', weight:2,
+        opacity:0.6, fillOpacity:0.05
+      }).addTo(map);
+      showToast(`⭕ Buffer 1km untuk ${json.stasiun}`);
+    }
+  } catch(_) { showToast('Gagal membuat buffer', 'error'); }
+});
+
+// ── FABs ─────────────────────────────────────────────────────
+document.getElementById('fab-home').addEventListener('click', () => {
+  map.flyTo(MEDAN_CENTER, 13, { duration: 1.2 });
+});
+
+document.getElementById('fab-satellite').addEventListener('click', function() {
+  useSatellite = !useSatellite;
+  if (useSatellite) { map.removeLayer(tileOSM); map.addLayer(tileSat); this.classList.add('active'); }
+  else              { map.removeLayer(tileSat);  map.addLayer(tileOSM); this.classList.remove('active'); }
+});
+
+document.getElementById('fab-fullscreen').addEventListener('click', () => {
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+  else document.exitFullscreen();
+});
+
+document.getElementById('fab-add').addEventListener('click', () => {
+  const token = localStorage.getItem('ev_token');
+  if (!token) { showToast('Login terlebih dahulu untuk menambah stasiun', 'error'); window.location.href='login.html'; return; }
+  window.location.href = 'dashboard.html?action=add';
+});
+
+// ── Panel toggle ─────────────────────────────────────────────
+document.querySelectorAll('[data-toggle]').forEach(head => {
+  head.addEventListener('click', () => {
+    const body = document.getElementById(head.dataset.toggle);
+    body.classList.toggle('hidden');
+  });
+});
+
+// ── Sidebar toggle ────────────────────────────────────────────
+document.getElementById('sidebar-toggle').addEventListener('click', () => {
+  document.getElementById('sidebar').classList.toggle('collapsed');
+});
+document.getElementById('sidebar-close').addEventListener('click', () => {
+  document.getElementById('sidebar').classList.add('collapsed');
+});
+
+// ============================================================
+// SEARCH AUTOCOMPLETE
+// ============================================================
+let searchIndex = [];
+
+function buildSearchIndex(features) {
+  searchIndex = features.map(f => {
+    const p = f.properties || f;
+    return { id: p.id, nama: p.nama, jenis: p.jenis, alamat: p.alamat, lat: p.latitude, lon: p.longitude };
+  });
+}
+
+const searchInput    = document.getElementById('search-input');
+const searchDropdown = document.getElementById('search-dropdown');
+
+searchInput.addEventListener('input', () => {
+  const q = searchInput.value.toLowerCase().trim();
+  if (!q) { searchDropdown.classList.remove('show'); return; }
+
+  const results = searchIndex.filter(s => s.nama.toLowerCase().includes(q)).slice(0, 6);
+  if (!results.length) { searchDropdown.classList.remove('show'); return; }
+
+  searchDropdown.innerHTML = results.map(r => `
+    <div class="search-dropdown-item" data-lat="${r.lat}" data-lon="${r.lon}" data-id="${r.id}">
+      <span class="badge badge-${r.jenis.toLowerCase()}">${r.jenis}</span>
+      <span>${r.nama}</span>
+    </div>
+  `).join('');
+
+  searchDropdown.classList.add('show');
+
+  searchDropdown.querySelectorAll('.search-dropdown-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const lat = parseFloat(item.dataset.lat);
+      const lon = parseFloat(item.dataset.lon);
+      map.flyTo([lat, lon], 17, { duration: 1.2 });
+      searchDropdown.classList.remove('show');
+      searchInput.value = item.querySelector('span:last-child').textContent;
+      selectedStasiunId = parseInt(item.dataset.id);
+      selectedLat = lat; selectedLon = lon;
+    });
+  });
+});
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.search-wrap')) searchDropdown.classList.remove('show');
+});
+
+// ============================================================
+// AUTH STATE
+// ============================================================
+(function checkAuth() {
+  const token = localStorage.getItem('ev_token');
+  if (!token) return;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const bar = document.getElementById('user-bar');
+    bar.innerHTML = `
+      <img src="${payload.avatar_url || ''}" onerror="this.style.display='none'">
+      <div>
+        <div class="name">${payload.name || payload.email}</div>
+        <div class="role">${payload.role === 'admin' ? '👑 Admin' : '👤 User'}</div>
+      </div>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="#" id="btn-logout" style="color:#ef4444;margin-left:6px">Logout</a>
+    `;
+    document.getElementById('btn-logout')?.addEventListener('click', e => {
+      e.preventDefault();
+      localStorage.removeItem('ev_token');
+      window.location.reload();
+    });
+  } catch(_) { localStorage.removeItem('ev_token'); }
+})();
+
+// ============================================================
+// UTILITY
+// ============================================================
+let infoTimeout;
+function showInfoBox(msg, duration) {
+  const box = document.getElementById('info-box');
+  box.textContent = msg;
+  box.classList.add('show');
+  clearTimeout(infoTimeout);
+  if (duration) infoTimeout = setTimeout(() => box.classList.remove('show'), duration);
+}
+
+function showToast(msg, type = 'success') {
+  const container = document.getElementById('toast-map');
+  const div = document.createElement('div');
+  div.className = 'toast-m';
+  div.textContent = msg;
+  container.appendChild(div);
+  setTimeout(() => div.remove(), 3000);
+}
+
+// ============================================================
+// START
+// ============================================================
+initMap();
+</script>
+</body>
+</html>

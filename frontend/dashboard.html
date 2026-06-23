@@ -1,0 +1,1569 @@
+<!DOCTYPE html>
+<!-- FILE: frontend/dashboard.html -->
+<!-- Dashboard User & Admin — SIG EV Station Medan -->
+<!-- Hikmal Akbar | 2305181024 | Teknologi Rekayasa Perangkat Lunak -->
+<html lang="id">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboard — SIG EV Station Medan</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet"/>
+  <!-- Leaflet untuk picker koordinat -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+  <style>
+    /* ============================================================
+       RESET & VARIABLES
+    ============================================================ */
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --green:#22c55e;--green-d:#16a34a;--blue:#3b82f6;
+      --yellow:#facc15;--red:#ef4444;
+      --dark:#0a0f1e;--dark2:#111827;--dark3:#1f2937;
+      --card:#1a2235;--text:#f1f5f9;--muted:#94a3b8;
+      --border:rgba(255,255,255,0.08);
+      --radius:14px;--sidebar-w:240px;
+      --ff:'Inter',sans-serif;--ff-h:'Space Grotesk',sans-serif;
+    }
+    html,body{height:100%;font-family:var(--ff);background:var(--dark);color:var(--text)}
+    a{text-decoration:none;color:inherit}
+    button{font-family:var(--ff);cursor:pointer}
+    input,select,textarea{font-family:var(--ff)}
+
+    /* ============================================================
+       LAYOUT
+    ============================================================ */
+    #layout{display:flex;min-height:100vh}
+
+    /* ============================================================
+       SIDEBAR NAV
+    ============================================================ */
+    #sidenav{
+      width:var(--sidebar-w);flex-shrink:0;
+      background:var(--dark2);border-right:1px solid var(--border);
+      display:flex;flex-direction:column;
+      position:sticky;top:0;height:100vh;overflow-y:auto;
+    }
+    .sidenav-logo{
+      padding:20px 20px 16px;
+      display:flex;align-items:center;gap:10px;
+      border-bottom:1px solid var(--border);
+    }
+    .sidenav-logo span{
+      font-family:var(--ff-h);font-weight:700;font-size:0.95rem;color:var(--green);
+    }
+    .sidenav-user{
+      padding:14px 18px;border-bottom:1px solid var(--border);
+      display:flex;align-items:center;gap:10px;
+    }
+    .sidenav-user img{
+      width:36px;height:36px;border-radius:50%;
+      border:2px solid rgba(34,197,94,0.3);
+    }
+    .sidenav-user .name{font-size:0.82rem;font-weight:600;line-height:1.3}
+    .sidenav-user .role{font-size:0.7rem;color:var(--green)}
+
+    .nav-section{padding:14px 12px 6px;font-size:0.68rem;font-weight:700;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase}
+    .nav-item{
+      display:flex;align-items:center;gap:10px;
+      padding:10px 18px;font-size:0.84rem;font-weight:500;
+      color:var(--muted);border-radius:10px;margin:2px 8px;
+      transition:background 0.15s,color 0.15s;cursor:pointer;
+    }
+    .nav-item:hover{background:var(--dark3);color:var(--text)}
+    .nav-item.active{background:rgba(34,197,94,0.12);color:var(--green);font-weight:600}
+    .nav-item .icon{font-size:1rem;flex-shrink:0}
+    .nav-item .badge-count{
+      margin-left:auto;background:var(--green);color:#000;
+      font-size:0.65rem;font-weight:700;padding:2px 6px;border-radius:99px;
+    }
+
+    .sidenav-bottom{
+      margin-top:auto;padding:14px;border-top:1px solid var(--border);
+      display:flex;flex-direction:column;gap:6px;
+    }
+    .sidenav-bottom a{
+      display:flex;align-items:center;gap:8px;
+      padding:8px 10px;border-radius:8px;font-size:0.8rem;color:var(--muted);
+      transition:color 0.15s,background 0.15s;
+    }
+    .sidenav-bottom a:hover{color:var(--text);background:var(--dark3)}
+    .sidenav-bottom a.logout{color:#ef4444}
+    .sidenav-bottom a.logout:hover{background:rgba(239,68,68,0.1)}
+
+    /* ============================================================
+       MAIN CONTENT
+    ============================================================ */
+    #main{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+
+    /* Top bar */
+    .topbar{
+      background:var(--dark2);border-bottom:1px solid var(--border);
+      padding:14px 24px;
+      display:flex;align-items:center;justify-content:space-between;gap:16px;
+      position:sticky;top:0;z-index:100;
+    }
+    .topbar-title{font-family:var(--ff-h);font-size:1.05rem;font-weight:700}
+    .topbar-actions{display:flex;align-items:center;gap:10px}
+    .btn{
+      padding:8px 18px;border-radius:99px;font-size:0.82rem;font-weight:600;
+      border:none;display:inline-flex;align-items:center;gap:6px;
+      transition:transform 0.15s,opacity 0.15s;
+    }
+    .btn:hover{transform:scale(1.03)}
+    .btn-green{background:var(--green);color:#000}
+    .btn-outline{background:none;border:1px solid var(--border);color:var(--muted)}
+    .btn-outline:hover{border-color:var(--green);color:var(--green)}
+    .btn-red{background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.2)}
+    .btn-sm{padding:6px 12px;font-size:0.75rem}
+
+    /* Page body */
+    .page-body{padding:24px;overflow-y:auto;flex:1}
+    .page{display:none}
+    .page.active{display:block}
+
+    /* ============================================================
+       STATS CARDS
+    ============================================================ */
+    .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:24px}
+    .stat-card{
+      background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+      padding:20px;position:relative;overflow:hidden;
+    }
+    .stat-card::before{
+      content:'';position:absolute;top:-20px;right:-20px;
+      width:80px;height:80px;border-radius:50%;
+      background:var(--accent,rgba(34,197,94,0.08));
+      pointer-events:none;
+    }
+    .stat-card .stat-icon{font-size:1.6rem;margin-bottom:10px}
+    .stat-card .stat-val{
+      font-family:var(--ff-h);font-size:2rem;font-weight:800;
+      color:var(--accent-color,var(--green));line-height:1;
+    }
+    .stat-card .stat-label{font-size:0.78rem;color:var(--muted);margin-top:4px}
+
+    /* ============================================================
+       TABLE
+    ============================================================ */
+    .table-wrap{
+      background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+      overflow:hidden;
+    }
+    .table-header{
+      padding:16px 20px;border-bottom:1px solid var(--border);
+      display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+    }
+    .table-header h3{font-size:0.9rem;font-weight:700}
+    table{width:100%;border-collapse:collapse}
+    th,td{
+      padding:12px 16px;text-align:left;font-size:0.82rem;
+      border-bottom:1px solid var(--border);
+    }
+    th{
+      background:var(--dark3);color:var(--muted);font-weight:600;
+      font-size:0.72rem;text-transform:uppercase;letter-spacing:0.06em;
+    }
+    tr:last-child td{border-bottom:none}
+    tr:hover td{background:rgba(255,255,255,0.015)}
+    .badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:99px;font-size:0.7rem;font-weight:600}
+    .badge-spklu{background:rgba(34,197,94,0.12);color:var(--green)}
+    .badge-spbklu{background:rgba(59,130,246,0.12);color:var(--blue)}
+    .badge-ok{background:rgba(34,197,94,0.1);color:var(--green)}
+    .badge-warn{background:rgba(250,204,21,0.1);color:var(--yellow)}
+    .badge-err{background:rgba(239,68,68,0.1);color:var(--red)}
+    .table-thumb{width:44px;height:36px;border-radius:6px;object-fit:cover;background:var(--dark3)}
+    .td-actions{display:flex;gap:6px}
+
+    /* ============================================================
+       FORM (Tambah / Edit Stasiun)
+    ============================================================ */
+    .form-wrap{
+      background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+      padding:28px;max-width:820px;
+    }
+    .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .form-grid.full{grid-template-columns:1fr}
+    .form-group{display:flex;flex-direction:column;gap:6px}
+    .form-group label{font-size:0.78rem;font-weight:600;color:var(--muted)}
+    .form-group input,
+    .form-group select,
+    .form-group textarea{
+      padding:10px 14px;background:var(--dark3);
+      border:1px solid var(--border);border-radius:10px;
+      color:var(--text);font-size:0.85rem;outline:none;
+      transition:border-color 0.2s;
+    }
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus{border-color:rgba(34,197,94,0.4)}
+    .form-group textarea{resize:vertical;min-height:80px}
+    .form-section{
+      margin-top:24px;padding-top:20px;
+      border-top:1px solid var(--border);
+    }
+    .form-section h4{font-size:0.88rem;font-weight:700;margin-bottom:14px;color:var(--text)}
+    .form-actions{
+      margin-top:24px;display:flex;gap:10px;flex-wrap:wrap;
+      padding-top:16px;border-top:1px solid var(--border);
+    }
+
+    /* Unit/kabinet dynamic rows */
+    .dynamic-row{
+      background:var(--dark3);border:1px solid var(--border);
+      border-radius:10px;padding:14px;margin-bottom:10px;
+      position:relative;
+    }
+    .dynamic-row .remove-row{
+      position:absolute;top:10px;right:10px;
+      background:rgba(239,68,68,0.1);border:none;
+      color:#ef4444;width:26px;height:26px;border-radius:6px;
+      display:flex;align-items:center;justify-content:center;font-size:0.9rem;
+    }
+    .dynamic-row .remove-row:hover{background:rgba(239,68,68,0.2)}
+    .add-row-btn{
+      width:100%;padding:9px;border-radius:8px;
+      background:none;border:1px dashed var(--border);
+      color:var(--muted);font-size:0.8rem;
+      transition:border-color 0.2s,color 0.2s;
+    }
+    .add-row-btn:hover{border-color:var(--green);color:var(--green)}
+
+    /* Map picker */
+    #map-picker{width:100%;height:280px;border-radius:10px;border:1px solid var(--border);margin-top:6px}
+    .coord-display{
+      display:flex;gap:8px;margin-top:8px;
+    }
+    .coord-display input{flex:1;background:var(--dark3);border:1px solid var(--border);border-radius:8px;padding:7px 12px;color:var(--green);font-size:0.82rem}
+
+    /* Photo upload */
+    .upload-zone{
+      border:2px dashed var(--border);border-radius:10px;
+      padding:28px;text-align:center;cursor:pointer;
+      transition:border-color 0.2s,background 0.2s;
+      background:var(--dark3);
+    }
+    .upload-zone:hover{border-color:var(--green);background:rgba(34,197,94,0.03)}
+    .upload-zone.dragging{border-color:var(--green);background:rgba(34,197,94,0.05)}
+    .upload-zone .icon{font-size:2rem;margin-bottom:8px}
+    .upload-zone p{font-size:0.82rem;color:var(--muted)}
+    .upload-zone .hint{font-size:0.72rem;color:var(--muted);margin-top:4px}
+    .upload-preview{
+      width:100%;height:160px;object-fit:cover;border-radius:10px;
+      margin-top:10px;border:1px solid var(--border);display:none;
+    }
+
+    /* ============================================================
+       ADMIN PANEL — All Stasiun table
+    ============================================================ */
+    .search-filter-bar{
+      display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    }
+    .search-filter-bar input{
+      padding:8px 14px;background:var(--dark3);
+      border:1px solid var(--border);border-radius:8px;
+      color:var(--text);font-size:0.82rem;outline:none;min-width:200px;
+    }
+    .search-filter-bar input:focus{border-color:rgba(34,197,94,0.4)}
+    .search-filter-bar select{
+      padding:8px 10px;background:var(--dark3);
+      border:1px solid var(--border);border-radius:8px;
+      color:var(--text);font-size:0.82rem;outline:none;
+    }
+
+    /* ============================================================
+       EMPTY STATE
+    ============================================================ */
+    .empty-state{
+      text-align:center;padding:60px 20px;color:var(--muted);
+    }
+    .empty-state .emoji{font-size:3rem;margin-bottom:14px}
+    .empty-state h3{font-size:1rem;font-weight:600;margin-bottom:8px;color:var(--text)}
+    .empty-state p{font-size:0.82rem;line-height:1.6}
+
+    /* ============================================================
+       SKELETON
+    ============================================================ */
+    .skeleton{
+      background:linear-gradient(90deg,var(--dark3) 25%,var(--card) 50%,var(--dark3) 75%);
+      background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:8px;
+    }
+    @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+    /* ============================================================
+       TOAST
+    ============================================================ */
+    #toast-dash{
+      position:fixed;bottom:24px;right:24px;z-index:2000;
+      display:flex;flex-direction:column;gap:8px;
+    }
+    .toast-d{
+      padding:12px 18px;background:var(--card);border:1px solid var(--border);
+      border-radius:10px;font-size:0.82rem;
+      display:flex;align-items:center;gap:8px;
+      animation:slide-in 0.3s ease;min-width:240px;
+      box-shadow:0 8px 32px rgba(0,0,0,0.3);
+    }
+    .toast-d.success{border-color:rgba(34,197,94,0.3)}
+    .toast-d.error{border-color:rgba(239,68,68,0.3)}
+    @keyframes slide-in{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+
+    /* ============================================================
+       MODAL
+    ============================================================ */
+    .modal-overlay{
+      position:fixed;inset:0;z-index:1500;
+      background:rgba(0,0,0,0.7);backdrop-filter:blur(6px);
+      display:flex;align-items:center;justify-content:center;padding:20px;
+      opacity:0;pointer-events:none;transition:opacity 0.2s;
+    }
+    .modal-overlay.show{opacity:1;pointer-events:all}
+    .modal{
+      background:var(--card);border:1px solid var(--border);border-radius:20px;
+      padding:28px;max-width:480px;width:100%;
+      transform:scale(0.95);transition:transform 0.2s;
+    }
+    .modal-overlay.show .modal{transform:scale(1)}
+    .modal h3{font-family:var(--ff-h);font-size:1.1rem;font-weight:700;margin-bottom:10px}
+    .modal p{font-size:0.85rem;color:var(--muted);margin-bottom:20px;line-height:1.6}
+    .modal-actions{display:flex;gap:10px;justify-content:flex-end}
+
+    /* ============================================================
+       MOBILE SIDEBAR TOGGLE
+    ============================================================ */
+    #mobile-nav-toggle{
+      display:none;background:none;border:none;color:var(--text);font-size:1.3rem;padding:4px;
+    }
+    @media(max-width:860px){
+      #sidenav{
+        position:fixed;left:0;top:0;bottom:0;z-index:500;
+        transform:translateX(-100%);transition:transform 0.3s;
+      }
+      #sidenav.open{transform:translateX(0)}
+      #mobile-nav-toggle{display:block}
+      .form-grid{grid-template-columns:1fr}
+      .stats-row{grid-template-columns:1fr 1fr}
+    }
+    @media(max-width:480px){
+      .stats-row{grid-template-columns:1fr}
+      .page-body{padding:16px}
+    }
+  </style>
+</head>
+<body>
+<div id="layout">
+
+  <!-- ============================================================
+       SIDEBAR NAV
+  ============================================================ -->
+  <nav id="sidenav">
+    <div class="sidenav-logo">
+      <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
+        <circle cx="16" cy="16" r="14" stroke="#22c55e" stroke-width="2"/>
+        <path d="M18 7L10 17h8L8 25l14-11h-8L18 7z" fill="#22c55e"/>
+      </svg>
+      <span>EV Station Medan</span>
+    </div>
+
+    <!-- User info -->
+    <div class="sidenav-user" id="sidenav-user">
+      <img src="" id="user-avatar" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 36 36%22><rect width=%2236%22 height=%2236%22 fill=%22%231f2937%22/><text x=%2218%22 y=%2223%22 text-anchor=%22middle%22 font-size=%2216%22>👤</text></svg>'" alt="avatar">
+      <div>
+        <div class="name" id="user-name">Loading...</div>
+        <div class="role" id="user-role">user</div>
+      </div>
+    </div>
+
+    <!-- Nav items -->
+    <div class="nav-section">Menu</div>
+    <div class="nav-item active" data-page="overview">
+      <span class="icon">📊</span> Overview
+    </div>
+    <div class="nav-item" data-page="my-stasiun">
+      <span class="icon">📍</span> Stasiun Saya
+      <span class="badge-count" id="nav-count">0</span>
+    </div>
+    <div class="nav-item" data-page="form-stasiun">
+      <span class="icon">➕</span> Tambah Stasiun
+    </div>
+
+    <!-- Admin only -->
+    <div id="admin-nav" style="display:none">
+      <div class="nav-section">Admin</div>
+      <div class="nav-item" data-page="all-stasiun">
+        <span class="icon">🗃️</span> Semua Stasiun
+      </div>
+      <div class="nav-item" data-page="users-list">
+        <span class="icon">👥</span> Daftar User
+      </div>
+    </div>
+
+    <div class="nav-section">Lainnya</div>
+    <div class="nav-item" onclick="window.location.href='map.html'">
+      <span class="icon">🗺️</span> Buka Peta
+    </div>
+    <div class="nav-item" onclick="window.location.href='report.html'">
+      <span class="icon">📋</span> Laporan
+    </div>
+
+    <div class="sidenav-bottom">
+      <a href="index.html">🏠 Beranda</a>
+      <a href="#" id="btn-logout" class="logout">🚪 Logout</a>
+    </div>
+  </nav>
+
+  <!-- ============================================================
+       MAIN
+  ============================================================ -->
+  <div id="main">
+    <!-- Topbar -->
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px">
+        <button id="mobile-nav-toggle">☰</button>
+        <div class="topbar-title" id="topbar-title">Overview</div>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn btn-green" onclick="switchPage('form-stasiun')">
+          ➕ Tambah Stasiun
+        </button>
+        <a href="map.html" class="btn btn-outline">🗺️ Peta</a>
+      </div>
+    </div>
+
+    <!-- Pages -->
+    <div class="page-body">
+
+      <!-- ======================================================
+           PAGE: OVERVIEW
+      ====================================================== -->
+      <div class="page active" id="page-overview">
+        <div class="stats-row" id="stats-row">
+          <div class="stat-card" style="--accent:rgba(34,197,94,0.08);--accent-color:var(--green)">
+            <div class="stat-icon">⚡</div>
+            <div class="stat-val" id="stat-spklu">—</div>
+            <div class="stat-label">Stasiun SPKLU saya</div>
+          </div>
+          <div class="stat-card" style="--accent:rgba(59,130,246,0.08);--accent-color:var(--blue)">
+            <div class="stat-icon">🔋</div>
+            <div class="stat-val" id="stat-spbklu">—</div>
+            <div class="stat-label">Stasiun SPBKLU saya</div>
+          </div>
+          <div class="stat-card" style="--accent:rgba(34,197,94,0.08);--accent-color:var(--green)">
+            <div class="stat-icon">🟢</div>
+            <div class="stat-val" id="stat-aktif">—</div>
+            <div class="stat-label">Stasiun aktif</div>
+          </div>
+          <div class="stat-card" style="--accent:rgba(250,204,21,0.08);--accent-color:var(--yellow)">
+            <div class="stat-icon">📅</div>
+            <div class="stat-val" id="stat-bulan">—</div>
+            <div class="stat-label">Bulan ini ditambahkan</div>
+          </div>
+        </div>
+
+        <!-- Recent stasiun -->
+        <div class="table-wrap">
+          <div class="table-header">
+            <h3>Stasiun Terbaru Saya</h3>
+            <button class="btn btn-outline btn-sm" onclick="switchPage('my-stasiun')">Lihat Semua →</button>
+          </div>
+          <div id="overview-table-body">
+            <div style="padding:20px">
+              <div class="skeleton" style="height:44px;margin-bottom:8px"></div>
+              <div class="skeleton" style="height:44px;margin-bottom:8px"></div>
+              <div class="skeleton" style="height:44px"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================
+           PAGE: MY STASIUN
+      ====================================================== -->
+      <div class="page" id="page-my-stasiun">
+        <div class="table-wrap">
+          <div class="table-header">
+            <h3>📍 Stasiun Saya</h3>
+            <button class="btn btn-green btn-sm" onclick="switchPage('form-stasiun')">➕ Tambah</button>
+          </div>
+          <div id="my-stasiun-body">
+            <div class="empty-state">
+              <div class="emoji">📡</div>
+              <h3>Memuat data...</h3>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================
+           PAGE: FORM TAMBAH / EDIT STASIUN
+      ====================================================== -->
+      <div class="page" id="page-form-stasiun">
+        <div class="form-wrap">
+          <h2 style="font-family:var(--ff-h);font-size:1.2rem;font-weight:700;margin-bottom:4px" id="form-title">➕ Tambah Stasiun Baru</h2>
+          <p style="font-size:0.82rem;color:var(--muted);margin-bottom:24px">
+            Koordinat bisa diisi manual atau klik pada peta di bawah.
+          </p>
+          <input type="hidden" id="edit-id"/>
+
+          <!-- BAGIAN 1: Info Dasar -->
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Nama Stasiun *</label>
+              <input type="text" id="f-nama" placeholder="cth: SPKLU PLN Medan Baru"/>
+            </div>
+            <div class="form-group">
+              <label>Jenis Stasiun *</label>
+              <select id="f-jenis">
+                <option value="">-- Pilih Jenis --</option>
+                <option value="SPKLU">SPKLU (Pengisian)</option>
+                <option value="SPBKLU">SPBKLU (Swap Baterai)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Badan Usaha</label>
+              <input type="text" id="f-badan" placeholder="cth: PT PLN (Persero)"/>
+            </div>
+            <div class="form-group">
+              <label>Provider / Aplikasi</label>
+              <input type="text" id="f-provider" placeholder="cth: PLN Mobile"/>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top:16px">
+            <label>Alamat Lengkap</label>
+            <textarea id="f-alamat" placeholder="Jl. Contoh No.1, Kelurahan, Kecamatan, Kota Medan"></textarea>
+          </div>
+
+          <div class="form-grid" style="margin-top:12px">
+            <div class="form-group">
+              <label>Status Operasi</label>
+              <select id="f-status">
+                <option value="Beroperasi">🟢 Beroperasi</option>
+                <option value="Maintenance">🟡 Maintenance</option>
+                <option value="Tidak Beroperasi">🔴 Tidak Beroperasi</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Kota</label>
+              <input type="text" id="f-kota" value="KOTA MEDAN"/>
+            </div>
+          </div>
+
+          <!-- BAGIAN 2: Koordinat + Peta Picker -->
+          <div class="form-section">
+            <h4>📍 Koordinat (klik peta untuk memilih)</h4>
+            <div id="map-picker"></div>
+            <div class="coord-display">
+              <input type="text" id="f-lat" placeholder="Latitude (cth: 3.5919)" readonly/>
+              <input type="text" id="f-lon" placeholder="Longitude (cth: 98.6662)" readonly/>
+              <button class="btn btn-outline btn-sm" id="btn-use-loc" title="Gunakan lokasi saya">📡</button>
+            </div>
+            <p style="font-size:0.72rem;color:var(--muted);margin-top:6px">SRID 4326 (WGS84) — akan disimpan sebagai <code>ST_SetSRID(ST_MakePoint(lon, lat), 4326)</code></p>
+          </div>
+
+          <!-- BAGIAN 3: Foto -->
+          <div class="form-section">
+            <h4>🖼️ Foto Stasiun (upload ke Cloudinary)</h4>
+            <div class="upload-zone" id="upload-zone">
+              <div class="icon">📷</div>
+              <p>Drag & drop atau <strong style="color:var(--green)">klik untuk pilih file</strong></p>
+              <div class="hint">JPG, PNG, WebP — Maks. 5 MB</div>
+              <input type="file" id="foto-input" accept="image/*" style="display:none"/>
+            </div>
+            <img id="foto-preview" class="upload-preview" alt="preview"/>
+            <input type="hidden" id="f-foto-url"/>
+            <p id="upload-status" style="font-size:0.75rem;color:var(--muted);margin-top:6px"></p>
+          </div>
+
+          <!-- BAGIAN 4: Unit Pengisian (SPKLU) -->
+          <div class="form-section" id="section-units" style="display:none">
+            <h4>⚡ Unit Pengisian (SPKLU)</h4>
+            <div id="units-list"></div>
+            <button class="add-row-btn" id="btn-add-unit">+ Tambah Unit Charger</button>
+          </div>
+
+          <!-- BAGIAN 5: Kabinet Swap (SPBKLU) -->
+          <div class="form-section" id="section-kabinets" style="display:none">
+            <h4>🔋 Kabinet Swap (SPBKLU)</h4>
+            <div id="kabinets-list"></div>
+            <button class="add-row-btn" id="btn-add-kabinet">+ Tambah Kabinet</button>
+          </div>
+
+          <!-- Submit -->
+          <div class="form-actions">
+            <button class="btn btn-green" id="btn-submit-form">💾 Simpan Stasiun</button>
+            <button class="btn btn-outline" onclick="switchPage('my-stasiun')">Batal</button>
+            <button class="btn btn-red btn-sm" id="btn-delete-form" style="display:none;margin-left:auto">🗑️ Hapus Stasiun</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================
+           PAGE: ALL STASIUN (Admin)
+      ====================================================== -->
+      <div class="page" id="page-all-stasiun">
+        <div class="table-wrap">
+          <div class="table-header">
+            <h3>🗃️ Semua Stasiun (Admin)</h3>
+            <div class="search-filter-bar">
+              <input type="text" id="admin-search" placeholder="🔍 Cari nama stasiun..."/>
+              <select id="admin-filter-jenis">
+                <option value="">Semua Jenis</option>
+                <option value="SPKLU">SPKLU</option>
+                <option value="SPBKLU">SPBKLU</option>
+              </select>
+              <select id="admin-filter-status">
+                <option value="">Semua Status</option>
+                <option value="Beroperasi">Beroperasi</option>
+                <option value="Maintenance">Maintenance</option>
+                <option value="Tidak Beroperasi">Tidak Beroperasi</option>
+              </select>
+            </div>
+          </div>
+          <div id="admin-table-body">
+            <div class="empty-state">
+              <div class="emoji">🔄</div>
+              <h3>Memuat data...</h3>
+            </div>
+          </div>
+          <div id="admin-pagination" style="padding:14px 16px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;font-size:0.8rem;color:var(--muted)">
+            <span id="admin-count-info"></span>
+            <div style="display:flex;gap:6px" id="admin-page-btns"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================
+           PAGE: USERS LIST (Admin)
+      ====================================================== -->
+      <div class="page" id="page-users-list">
+        <div class="table-wrap">
+            <div class="table-header">
+              <h3>👥 Daftar User Terdaftar</h3>
+                <button class="btn btn-green btn-sm" onclick="showAddUserModal()">+ Tambah User</button>
+            </div>
+          <div id="users-table-body">
+            <div class="empty-state"><div class="emoji">🔄</div><h3>Memuat data...</h3></div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- end page-body -->
+  </div><!-- end main -->
+
+</div><!-- end layout -->
+
+<!-- Modal Konfirmasi -->
+<div class="modal-overlay" id="modal-confirm">
+  <div class="modal">
+    <h3 id="modal-title">Konfirmasi Hapus</h3>
+    <p id="modal-msg">Apakah Anda yakin ingin menghapus stasiun ini? Tindakan ini tidak dapat dibatalkan.</p>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">Batal</button>
+      <button class="btn btn-red" id="modal-confirm-btn">Hapus</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Form User -->
+<div class="modal-overlay" id="modal-user">
+  <div class="modal">
+    <h3 id="user-modal-title">Tambah User</h3>
+    <div class="form-group">
+      <label>Email *</label>
+      <input type="email" id="user-email" placeholder="Email">
+    </div>
+    <div class="form-group">
+      <label>Nama</label>
+      <input type="text" id="user-name" placeholder="Nama">
+    </div>
+    <div class="form-group">
+      <label>Role</label>
+      <select id="user-role">
+        <option value="user">User</option>
+        <option value="admin">Admin</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeUserModal()">Batal</button>
+      <button class="btn btn-green" id="btn-save-user">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div id="toast-dash"></div>
+
+<!-- Leaflet JS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+
+<script>
+// ============================================================
+// FILE: frontend/dashboard.html (inline script)
+// Dashboard SIG EV Station Medan
+// Hikmal Akbar | 2305181024
+// ============================================================
+
+const API_BASE = 'http://localhost:3000/api';
+let currentUser   = null;
+let mapPicker     = null;
+let mapPickerMarker = null;
+let allStasiunAdmin = [];
+let adminPage     = 1;
+const ADMIN_LIMIT = 15;
+//const ADMIN_LIMIT = 200;
+let deleteTargetId = null;
+
+// ============================================================
+// AUTH CHECK
+// ============================================================
+function initAuth() {
+  const token = localStorage.getItem('ev_token');
+  if (!token) { window.location.href = 'login.html'; return; }
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    if (payload.exp * 1000 < Date.now()) {
+      localStorage.removeItem('ev_token');
+      window.location.href = 'login.html';
+      return;
+    }
+    currentUser = payload;
+    document.getElementById('user-name').textContent  = payload.name || payload.email;
+    document.getElementById('user-role').textContent  = payload.role === 'admin' ? '👑 Admin' : '👤 User';
+    document.getElementById('user-avatar').src        = payload.avatar_url || '';
+    if (payload.role === 'admin') {
+      document.getElementById('admin-nav').style.display = 'block';
+    }
+  } catch(_) {
+    localStorage.removeItem('ev_token');
+    window.location.href = 'login.html';
+  }
+}
+
+// ============================================================
+// LOGOUT
+// ============================================================
+document.getElementById('btn-logout').addEventListener('click', e => {
+  e.preventDefault();
+  localStorage.removeItem('ev_token');
+  localStorage.removeItem('ev_user');
+  window.location.href = 'index.html';
+});
+
+// ============================================================
+// PAGE ROUTING
+// ============================================================
+const pages = {
+  'overview':     { el: document.getElementById('page-overview'),     title: 'Overview' },
+  'my-stasiun':   { el: document.getElementById('page-my-stasiun'),   title: 'Stasiun Saya' },
+  'form-stasiun': { el: document.getElementById('page-form-stasiun'), title: 'Tambah Stasiun' },
+  'all-stasiun':  { el: document.getElementById('page-all-stasiun'),  title: 'Semua Stasiun' },
+  'users-list':   { el: document.getElementById('page-users-list'),   title: 'Daftar User' },
+};
+
+function switchPage(name) {
+  Object.values(pages).forEach(p => p.el.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const page = pages[name];
+  if (!page) return;
+  page.el.classList.add('active');
+  document.querySelector(`[data-page="${name}"]`)?.classList.add('active');
+  document.getElementById('topbar-title').textContent = page.title;
+  // Load data on demand
+  if (name === 'overview')    loadOverview();
+  if (name === 'my-stasiun')  loadMyStasiun();
+  if (name === 'form-stasiun') {
+    resetForm();
+    initMapPicker();
+    // Check query param for edit
+    const params = new URLSearchParams(location.search);
+    if (params.get('action') === 'edit' && params.get('id')) loadEditForm(params.get('id'));
+    else if (params.get('action') === 'add') { /* do nothing */ }
+  }
+  if (name === 'all-stasiun') loadAllStasiunAdmin();
+  if (name === 'users-list')  loadUsers();
+  // Close mobile menu
+  document.getElementById('sidenav').classList.remove('open');
+}
+
+document.querySelectorAll('.nav-item[data-page]').forEach(item => {
+  item.addEventListener('click', () => switchPage(item.dataset.page));
+});
+
+// Mobile toggle
+document.getElementById('mobile-nav-toggle').addEventListener('click', () => {
+  document.getElementById('sidenav').classList.toggle('open');
+});
+
+// ============================================================
+// OVERVIEW PAGE
+// ============================================================
+async function loadOverview() {
+  const token = localStorage.getItem('ev_token');
+  try {
+    const res  = await fetch(`${API_BASE}/stasiun/user/milik-saya`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const json = await res.json();
+    const data = json.data || [];
+
+    const spklu  = data.filter(d => d.jenis === 'SPKLU').length;
+    const spbklu = data.filter(d => d.jenis === 'SPBKLU').length;
+    const aktif  = data.filter(d => d.status === 'Beroperasi').length;
+    const thisMonth = data.filter(d => {
+      const m = new Date(d.created_at);
+      const n = new Date();
+      return m.getMonth() === n.getMonth() && m.getFullYear() === n.getFullYear();
+    }).length;
+
+    document.getElementById('stat-spklu').textContent  = spklu;
+    document.getElementById('stat-spbklu').textContent = spbklu;
+    document.getElementById('stat-aktif').textContent  = aktif;
+    document.getElementById('stat-bulan').textContent  = thisMonth;
+    document.getElementById('nav-count').textContent   = data.length;
+
+    // Recent table
+    const recent = data.slice(0, 5);
+    document.getElementById('overview-table-body').innerHTML = recent.length > 0
+      ? `<table>
+          <thead><tr><th>Foto</th><th>Nama</th><th>Jenis</th><th>Status</th><th>Tanggal</th><th>Aksi</th></tr></thead>
+          <tbody>${recent.map(s => renderTableRow(s)).join('')}</tbody>
+        </table>`
+      : `<div class="empty-state"><div class="emoji">🏗️</div><h3>Belum ada stasiun</h3><p>Tambahkan stasiun pertama Anda.</p></div>`;
+    attachRowActions();
+  } catch(_) {
+    document.getElementById('overview-table-body').innerHTML = `<div class="empty-state"><div class="emoji">⚠️</div><h3>Gagal memuat data</h3><p>Pastikan backend berjalan di localhost:3000</p></div>`;
+  }
+}
+
+// ============================================================
+// MY STASIUN PAGE
+// ============================================================
+async function loadMyStasiun() {
+  const token = localStorage.getItem('ev_token');
+  document.getElementById('my-stasiun-body').innerHTML = `<div class="empty-state"><div class="emoji">🔄</div><h3>Memuat...</h3></div>`;
+  try {
+    const res  = await fetch(`${API_BASE}/stasiun/user/milik-saya`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const json = await res.json();
+    const data = json.data || [];
+    document.getElementById('nav-count').textContent = data.length;
+    document.getElementById('my-stasiun-body').innerHTML = data.length > 0
+      ? `<table>
+          <thead><tr><th>Foto</th><th>Nama</th><th>Jenis</th><th>Status</th><th>Tanggal</th><th>Aksi</th></tr></thead>
+          <tbody>${data.map(s => renderTableRow(s)).join('')}</tbody>
+        </table>`
+      : `<div class="empty-state">
+          <div class="emoji">📭</div>
+          <h3>Belum ada stasiun</h3>
+          <p>Klik "Tambah Stasiun" untuk menambahkan SPKLU atau SPBKLU.</p>
+        </div>`;
+    attachRowActions();
+  } catch(_) {
+    document.getElementById('my-stasiun-body').innerHTML = `<div class="empty-state"><div class="emoji">⚠️</div><h3>Gagal memuat</h3></div>`;
+  }
+}
+
+function renderTableRow(s) {
+  const jenis = s.jenis || '-';
+  const statusClass = s.status === 'Beroperasi' ? 'badge-ok' : s.status === 'Maintenance' ? 'badge-warn' : 'badge-err';
+  const date = s.created_at ? new Date(s.created_at).toLocaleDateString('id-ID') : '-';
+  return `<tr>
+    <td><img class="table-thumb" src="${s.foto_stasiun_url || ''}" onerror="this.style.display='none'" alt=""/></td>
+    <td style="font-weight:500">${s.nama}</td>
+    <td><span class="badge badge-${jenis.toLowerCase()}">${jenis}</span></td>
+    <td><span class="badge ${statusClass}">${s.status || 'Beroperasi'}</span></td>
+    <td style="color:var(--muted)">${date}</td>
+    <td>
+      <div class="td-actions">
+        <button class="btn btn-outline btn-sm" onclick="window.location.href='stasiun.html?id=${s.id}'">👁️</button>
+        <button class="btn btn-outline btn-sm" onclick="editStasiun(${s.id})">✏️</button>
+        <button class="btn btn-red btn-sm btn-del-row" data-id="${s.id}" data-nama="${s.nama}">🗑️</button>
+      </div>
+    </td>
+  </tr>`;
+}
+
+function attachRowActions() {
+  document.querySelectorAll('.btn-edit-row').forEach(btn => {
+    btn.addEventListener('click', () => {
+      history.replaceState(null, '', `?action=edit&id=${btn.dataset.id}`);
+      switchPage('form-stasiun');
+    });
+  });
+  document.querySelectorAll('.btn-del-row').forEach(btn => {
+    btn.addEventListener('click', () => confirmDelete(parseInt(btn.dataset.id), btn.dataset.nama));
+  });
+}
+
+// ============================================================
+// ALL STASIUN ADMIN
+// ============================================================
+async function loadAllStasiunAdmin() {
+  const token = localStorage.getItem('ev_token');
+  try {
+    const q    = document.getElementById('admin-search')?.value || '';
+    const jenis = document.getElementById('admin-filter-jenis')?.value || '';
+    const status = document.getElementById('admin-filter-status')?.value || '';
+    const params = new URLSearchParams({ page: adminPage, limit: ADMIN_LIMIT });
+    if (jenis)  params.append('jenis', jenis);
+    if (status) params.append('status', status);
+
+    const res  = await fetch(`${API_BASE}/stasiun?${params}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const json = await res.json();
+    let features = json.features || [];
+
+    // Client-side search filter
+    if (q) features = features.filter(f => (f.properties?.nama || '').toLowerCase().includes(q.toLowerCase()));
+
+    allStasiunAdmin = features;
+    const total = json.total || features.length;
+
+    // Render tabel
+    document.getElementById('admin-table-body').innerHTML = features.length > 0
+      ? `<table>
+          <thead>
+            <tr><th>ID</th><th>Foto</th><th>Nama</th><th>Jenis</th><th>Provider</th><th>Status</th><th>Aksi</th></tr>
+          </thead>
+          <tbody>
+            ${features.map(f => {
+              const s = f.properties;
+              const statusClass = s.status === 'Beroperasi' ? 'badge-ok' : s.status === 'Maintenance' ? 'badge-warn' : 'badge-err';
+              return `<tr>
+                <td style="color:var(--muted)">#${s.id}</td>
+                <td><img class="table-thumb" src="${s.foto_stasiun_url||''}" onerror="this.style.display='none'" alt=""></td>
+                <td style="font-weight:500">${s.nama}</td>
+                <td><span class="badge badge-${s.jenis.toLowerCase()}">${s.jenis}</span></td>
+                <td style="color:var(--muted);font-size:0.78rem">${s.provider||'-'}</td>
+                <td><span class="badge ${statusClass}">${s.status}</span></td>
+                <td>
+                  <div class="td-actions">
+                    <button class="btn btn-outline btn-sm" onclick="window.open('stasiun.html?id=${s.id}')">👁️</button>
+                    <button class="btn btn-outline btn-sm" onclick="editStasiun(${s.id})">✏️</button>
+                    <button class="btn btn-red btn-sm btn-del-row" data-id="${s.id}" data-nama="${s.nama}">🗑️</button>
+                  </div>
+                </td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>`
+      : `<div class="empty-state"><div class="emoji">🗃️</div><h3>Tidak ada data</h3></div>`;
+
+    // Render pagination
+    renderAdminPagination(total);
+    
+    // Re-attach delete handlers
+    document.querySelectorAll('.btn-del-row').forEach(btn => {
+      btn.addEventListener('click', () => confirmDelete(parseInt(btn.dataset.id), btn.dataset.nama));
+    });
+  } catch(_) {
+    document.getElementById('admin-table-body').innerHTML = `<div class="empty-state"><div class="emoji">⚠️</div><h3>Gagal memuat</h3></div>`;
+    renderAdminPagination(0);
+  }
+}
+
+function renderAdminPagination(total) {
+  const totalPages = Math.ceil(total / ADMIN_LIMIT);
+  const container = document.getElementById('admin-page-btns');
+  if (!container) return;
+  container.innerHTML = '';
+  // Tombol Previous
+  const prevBtn = document.createElement('button');
+  prevBtn.textContent = '←';
+  prevBtn.className = 'btn btn-outline btn-sm';
+  prevBtn.disabled = adminPage === 1;
+  prevBtn.onclick = () => { if (adminPage > 1) { adminPage--; loadAllStasiunAdmin(); } };
+  container.appendChild(prevBtn);
+  // Nomor halaman (maks 5)
+  let startPage = Math.max(1, adminPage - 2);
+  let endPage = Math.min(totalPages, startPage + 4);
+  for (let i = startPage; i <= endPage; i++) {
+    const pageBtn = document.createElement('button');
+    pageBtn.textContent = i;
+    pageBtn.className = `btn btn-outline btn-sm ${i === adminPage ? 'active' : ''}`;
+    pageBtn.onclick = () => { adminPage = i; loadAllStasiunAdmin(); };
+    container.appendChild(pageBtn);
+  }
+  // Tombol Next
+  const nextBtn = document.createElement('button');
+  nextBtn.textContent = '→';
+  nextBtn.className = 'btn btn-outline btn-sm';
+  nextBtn.disabled = adminPage === totalPages;
+  nextBtn.onclick = () => { if (adminPage < totalPages) { adminPage++; loadAllStasiunAdmin(); } };
+  container.appendChild(nextBtn);
+  document.getElementById('admin-count-info').textContent = `Total ${total} stasiun`;
+}
+
+// Search & filter events untuk admin
+['admin-search','admin-filter-jenis','admin-filter-status'].forEach(id => {
+  document.getElementById(id)?.addEventListener('input', () => { adminPage=1; loadAllStasiunAdmin(); });
+  document.getElementById(id)?.addEventListener('change', () => { adminPage=1; loadAllStasiunAdmin(); });
+});
+
+// ============================================================
+// USERS LIST
+// ============================================================
+async function loadUsers() {
+  const token = localStorage.getItem('ev_token');
+  if (!token) return;
+  try {
+    const res = await fetch(`${API_BASE}/admin/users`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message);
+    const users = json.data;
+    if (users.length === 0) {
+      document.getElementById('users-table-body').innerHTML = `
+        <div class="empty-state">
+          <div class="emoji">📭</div>
+          <h3>Belum ada user terdaftar</h3>
+        </div>`;
+      return;
+    }
+    document.getElementById('users-table-body').innerHTML = `
+      <table style="width:100%">
+        <thead>
+          <tr><th>ID</th><th>Email</th><th>Nama</th><th>Role</th><th>Terdaftar</th><th>Aksi</th></tr>
+        </thead>
+        <tbody>
+          ${users.map(u => `
+            <tr>
+              <td>${u.id}</td>
+              <td>${u.email}</td>
+              <td>${u.name || '-'}</td>
+              <td><span class="badge ${u.role === 'admin' ? 'badge-ok' : 'badge-spklu'}">${u.role}</span></td>
+              <td>${new Date(u.created_at).toLocaleDateString('id-ID')}</td>
+              <td>
+                <button class="btn btn-outline btn-sm" onclick="editUser(${u.id}, '${u.email}', '${u.name || ''}', '${u.role}')">✏️</button>
+                <button class="btn btn-red btn-sm" onclick="deleteUser(${u.id})">🗑️</button>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  } catch (err) {
+    document.getElementById('users-table-body').innerHTML = `
+      <div class="empty-state">
+        <div class="emoji">⚠️</div>
+        <h3>Gagal memuat data user</h3>
+        <p>${err.message}</p>
+      </div>`;
+  }
+}
+
+let currentUserId = null;
+
+function showAddUserModal() {
+  currentUserId = null;
+  document.getElementById('user-modal-title').innerText = 'Tambah User';
+  document.getElementById('user-email').value = '';
+  document.getElementById('user-email').disabled = false;
+  document.getElementById('user-name').value = '';
+  document.getElementById('user-role').value = 'user';
+  document.getElementById('modal-user').classList.add('show');
+}
+
+function editUser(id, email, name, role) {
+  currentUserId = id;
+  document.getElementById('user-modal-title').innerText = 'Edit User';
+  document.getElementById('user-email').value = email;
+  document.getElementById('user-email').disabled = true; // email tidak bisa diubah
+  document.getElementById('user-name').value = name;
+  document.getElementById('user-role').value = role;
+  document.getElementById('modal-user').classList.add('show');
+}
+
+function closeUserModal() {
+  document.getElementById('modal-user').classList.remove('show');
+  document.getElementById('user-email').disabled = false;
+}
+
+async function deleteUser(id) {
+  if (!confirm('Hapus user ini? Tindakan ini tidak dapat dibatalkan.')) return;
+  const token = localStorage.getItem('ev_token');
+  try {
+    const res = await fetch(`${API_BASE}/admin/users/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const json = await res.json();
+    if (json.success) {
+      showToast('User berhasil dihapus', 'success');
+      loadUsers();
+    } else {
+      showToast(json.message || 'Gagal hapus user', 'error');
+    }
+  } catch (err) {
+    showToast('Error: ' + err.message, 'error');
+  }
+}
+
+// Event listener untuk tombol simpan user
+document.getElementById('btn-save-user').addEventListener('click', async () => {
+  const token = localStorage.getItem('ev_token');
+  const email = document.getElementById('user-email').value.trim();
+  const name = document.getElementById('user-name').value.trim();
+  const role = document.getElementById('user-role').value;
+  if (!email) {
+    showToast('Email wajib diisi', 'error');
+    return;
+  }
+  const payload = { email, name, role };
+  let url = `${API_BASE}/admin/users`;
+  let method = 'POST';
+  if (currentUserId) {
+    url = `${API_BASE}/admin/users/${currentUserId}`;
+    method = 'PUT';
+    delete payload.email; // email tidak boleh diupdate
+  }
+  try {
+    console.log('Saving user - currentUserId:', currentUserId, 'role:', role);
+    console.log('Role yang dipilih:', role); // Tambahkan log ini
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload)
+    });
+    const json = await res.json();
+    if (json.success) {
+      showToast(currentUserId ? 'User berhasil diupdate' : 'User berhasil ditambahkan', 'success');
+      closeUserModal();
+      loadUsers();
+    } else {
+      showToast(json.message || 'Gagal menyimpan user', 'error');
+    }
+  } catch (err) {
+    showToast('Error: ' + err.message, 'error');
+  }
+});
+
+// Tutup modal jika klik overlay
+document.getElementById('modal-user').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal-user')) closeUserModal();
+});
+
+// ============================================================
+// FORM — MAP PICKER (Leaflet)
+// ============================================================
+function initMapPicker() {
+  if (mapPicker) {
+    mapPicker.remove();
+    mapPicker = null;
+    mapPickerMarker = null;
+  }
+  setTimeout(() => {
+    mapPicker = L.map('map-picker', {
+      center: [3.5952, 98.6722], zoom: 13, zoomControl: true
+    });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap', maxZoom: 19
+    }).addTo(mapPicker);
+
+    mapPicker.on('click', e => {
+      const { lat, lng } = e.latlng;
+      setCoord(lat, lng);
+    });
+  }, 100);
+}
+
+function setCoord(lat, lon) {
+  document.getElementById('f-lat').value = lat.toFixed(7);
+  document.getElementById('f-lon').value = lon.toFixed(7);
+  if (mapPickerMarker) mapPicker.removeLayer(mapPickerMarker);
+  mapPickerMarker = L.marker([lat, lon], {
+    icon: L.divIcon({
+      className:'',iconSize:[24,24],iconAnchor:[12,24],
+      html:`<svg width="24" height="30" viewBox="0 0 24 30"><path d="M12 0C5.37 0 0 5.37 0 12c0 9 12 18 12 18s12-9 12-18C24 5.37 18.63 0 12 0z" fill="#22c55e"/><circle cx="12" cy="12" r="5" fill="white"/></svg>`
+    })
+  }).addTo(mapPicker);
+}
+
+// Tombol gunakan lokasi saya
+document.getElementById('btn-use-loc').addEventListener('click', () => {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(pos => {
+    const { latitude: lat, longitude: lon } = pos.coords;
+    setCoord(lat, lon);
+    mapPicker.flyTo([lat, lon], 17);
+  });
+});
+
+// ============================================================
+// FORM — FOTO UPLOAD
+// ============================================================
+const uploadZone  = document.getElementById('upload-zone');
+const fotoInput   = document.getElementById('foto-input');
+const fotoPreview = document.getElementById('foto-preview');
+const uploadStatus = document.getElementById('upload-status');
+
+uploadZone.addEventListener('click', () => fotoInput.click());
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragging'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragging'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault(); uploadZone.classList.remove('dragging');
+  const file = e.dataTransfer.files[0];
+  if (file) uploadFoto(file);
+});
+fotoInput.addEventListener('change', () => {
+  if (fotoInput.files[0]) uploadFoto(fotoInput.files[0]);
+});
+
+async function uploadFoto(file) {
+  const token = localStorage.getItem('ev_token');
+  if (!token) { showToast('Login diperlukan untuk upload foto', 'error'); return; }
+  uploadStatus.textContent = '⏳ Mengupload ke Cloudinary...';
+  uploadStatus.style.color = 'var(--muted)';
+
+  const fd = new FormData();
+  fd.append('foto', file);
+  try {
+    const res  = await fetch(`${API_BASE}/upload`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd
+    });
+    const json = await res.json();
+    if (json.success && json.url) {
+      document.getElementById('f-foto-url').value = json.url;
+      fotoPreview.src     = json.url;
+      fotoPreview.style.display = 'block';
+      uploadStatus.textContent  = '✅ Upload berhasil: ' + json.url.slice(0, 60) + '...';
+      uploadStatus.style.color  = 'var(--green)';
+    } else {
+      throw new Error(json.message || 'Upload gagal');
+    }
+  } catch(err) {
+    uploadStatus.textContent = '❌ ' + err.message;
+    uploadStatus.style.color = '#ef4444';
+  }
+}
+
+// ============================================================
+// FORM — JENIS CHANGE (tampilkan unit/kabinet section)
+// ============================================================
+document.getElementById('f-jenis').addEventListener('change', function() {
+  document.getElementById('section-units').style.display   = this.value === 'SPKLU'  ? 'block' : 'none';
+  document.getElementById('section-kabinets').style.display = this.value === 'SPBKLU' ? 'block' : 'none';
+});
+
+// ============================================================
+// FORM — DYNAMIC ROWS (Unit & Kabinet)
+// ============================================================
+let unitCount = 0;
+document.getElementById('btn-add-unit').addEventListener('click', () => {
+  unitCount++;
+  const div = document.createElement('div');
+  div.className = 'dynamic-row';
+  div.id = `unit-row-${unitCount}`;
+  div.innerHTML = `
+    <button class="remove-row" onclick="this.closest('.dynamic-row').remove()">✕</button>
+    <div style="font-size:0.78rem;font-weight:700;color:var(--green);margin-bottom:10px">Unit #${unitCount}</div>
+    <div class="form-grid">
+      <div class="form-group"><label>Nama Unit</label><input type="text" class="u-nama" placeholder="cth: Unit A"/></div>
+      <div class="form-group"><label>No. Identitas</label><input type="text" class="u-noid" placeholder="cth: PLN-001"/></div>
+      <div class="form-group"><label>Tipe Charger</label>
+        <select class="u-tipe">
+          <option>Slow Charging</option><option>Medium Charging</option>
+          <option>Fast Charging</option><option>Ultra Fast Charging</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Daya Min (kW)</label><input type="number" class="u-dmin" placeholder="7"/></div>
+      <div class="form-group"><label>Daya Max (kW)</label><input type="number" class="u-dmax" placeholder="50"/></div>
+      <div class="form-group"><label>Harga /kWh</label><input type="text" class="u-harga" placeholder="Rp 1.650"/></div>
+      <div class="form-group"><label>Biaya Layanan</label><input type="text" class="u-layanan" placeholder="Gratis / Rp 2.000/sesi"/></div>
+    </div>
+    <div style="margin-top:10px">
+      <label style="font-size:0.72rem;color:var(--muted);display:block;margin-bottom:6px;font-weight:600">Port Konektor (pisahkan dengan koma)</label>
+      <input type="text" class="u-ports" placeholder="cth: CCS2, CHAdeMO, Type 2 AC" style="width:100%;padding:8px 12px;background:var(--dark);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.82rem"/>
+    </div>
+  `;
+  document.getElementById('units-list').appendChild(div);
+});
+
+let kabinetCount = 0;
+document.getElementById('btn-add-kabinet').addEventListener('click', () => {
+  kabinetCount++;
+  const div = document.createElement('div');
+  div.className = 'dynamic-row';
+  div.innerHTML = `
+    <button class="remove-row" onclick="this.closest('.dynamic-row').remove()">✕</button>
+    <div style="font-size:0.78rem;font-weight:700;color:var(--blue);margin-bottom:10px">Kabinet #${kabinetCount}</div>
+    <div class="form-grid">
+      <div class="form-group"><label>Nama Kabinet</label><input type="text" class="k-nama" placeholder="cth: Kabinet A"/></div>
+      <div class="form-group"><label>Kapasitas (slot)</label><input type="number" class="k-kap" placeholder="8"/></div>
+      <div class="form-group form-grid full"><label>Harga Penukaran</label><input type="text" class="k-harga" placeholder="Rp 10.000/swap"/></div>
+    </div>
+  `;
+  document.getElementById('kabinets-list').appendChild(div);
+});
+
+// ============================================================
+// FORM — SUBMIT (Create / Update)
+// ============================================================
+document.getElementById('btn-submit-form').addEventListener('click', submitForm);
+
+async function submitForm() {
+  const token = localStorage.getItem('ev_token');
+  const editId  = document.getElementById('edit-id').value;
+  const isEdit  = !!editId;
+
+  // Collect values
+  const nama    = document.getElementById('f-nama').value.trim();
+  const jenis   = document.getElementById('f-jenis').value;
+  const lat     = parseFloat(document.getElementById('f-lat').value);
+  const lon     = parseFloat(document.getElementById('f-lon').value);
+
+  if (!nama || !jenis) { showToast('Nama dan Jenis wajib diisi', 'error'); return; }
+  if (isNaN(lat) || isNaN(lon)) { showToast('Klik peta untuk menentukan koordinat', 'error'); return; }
+
+  // Collect units
+  const units = [...document.querySelectorAll('#units-list .dynamic-row')].map(row => ({
+    nama_unit:       row.querySelector('.u-nama')?.value,
+    nomor_identitas: row.querySelector('.u-noid')?.value,
+    tipe_charger:    row.querySelector('.u-tipe')?.value,
+    daya_min_kw:     parseInt(row.querySelector('.u-dmin')?.value) || 0,
+    daya_max_kw:     parseInt(row.querySelector('.u-dmax')?.value) || 0,
+    harga_per_kwh:   row.querySelector('.u-harga')?.value,
+    biaya_layanan:   row.querySelector('.u-layanan')?.value,
+    ports: (row.querySelector('.u-ports')?.value || '').split(',').map(p => p.trim()).filter(Boolean).map(p => ({ jenis_port: p, status_port: 'Tersedia' }))
+  }));
+
+  // Collect kabinets
+  const kabinets = [...document.querySelectorAll('#kabinets-list .dynamic-row')].map(row => ({
+    nama_kabinet:     row.querySelector('.k-nama')?.value,
+    kapasitas_baterai: parseInt(row.querySelector('.k-kap')?.value) || 0,
+    harga_penukaran:  row.querySelector('.k-harga')?.value,
+  }));
+
+  const body = {
+    nama, jenis,
+    badan_usaha:     document.getElementById('f-badan').value,
+    provider:        document.getElementById('f-provider').value,
+    alamat:          document.getElementById('f-alamat').value,
+    kota:            document.getElementById('f-kota').value || 'KOTA MEDAN',
+    latitude:        lat,
+    longitude:       lon,
+    status:          document.getElementById('f-status').value,
+    foto_stasiun_url: document.getElementById('f-foto-url').value,
+    units, kabinets
+  };
+
+  const btn = document.getElementById('btn-submit-form');
+  btn.disabled = true;
+  btn.textContent = '⏳ Menyimpan...';
+
+  try {
+    const url    = isEdit ? `${API_BASE}/stasiun/${editId}` : `${API_BASE}/stasiun`;
+    const method = isEdit ? 'PUT' : 'POST';
+    const res    = await fetch(url, {
+      method, headers: { 'Content-Type':'application/json', Authorization:`Bearer ${token}` },
+      body: JSON.stringify(body)
+    });
+    const json = await res.json();
+    if (json.success) {
+      showToast(`✅ Stasiun berhasil ${isEdit?'diperbarui':'ditambahkan'}!`, 'success');
+      history.replaceState(null, '', location.pathname);
+      setTimeout(() => switchPage('my-stasiun'), 800);
+    } else {
+      throw new Error(json.message || 'Gagal menyimpan');
+    }
+  } catch(err) {
+    showToast('❌ ' + err.message, 'error');
+  } finally {
+    btn.disabled    = false;
+    btn.textContent = '💾 Simpan Stasiun';
+  }
+}
+
+// ============================================================
+// FORM — RESET
+// ============================================================
+function resetForm() {
+  document.getElementById('edit-id').value      = '';
+  document.getElementById('form-title').textContent = '➕ Tambah Stasiun Baru';
+  document.getElementById('btn-delete-form').style.display = 'none';
+  ['f-nama','f-badan','f-provider','f-alamat','f-lat','f-lon','f-foto-url'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('f-jenis').value  = '';
+  document.getElementById('f-status').value = 'Beroperasi';
+  document.getElementById('f-kota').value   = 'KOTA MEDAN';
+  document.getElementById('units-list').innerHTML    = '';
+  document.getElementById('kabinets-list').innerHTML = '';
+  document.getElementById('section-units').style.display    = 'none';
+  document.getElementById('section-kabinets').style.display = 'none';
+  fotoPreview.style.display = 'none';
+  uploadStatus.textContent  = '';
+  history.replaceState(null, '', location.pathname);
+}
+
+// ============================================================
+// FORM — LOAD EDIT
+// ============================================================
+async function loadEditForm(id) {
+  const token = localStorage.getItem('ev_token');
+  console.log('loadEditForm id:', id, 'token ada?', !!token);
+  if (!token) {
+    showToast('Token tidak ditemukan', 'error');
+    window.location.href = 'login.html';
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/stasiun/${id}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    console.log('response status:', res.status);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message);
+
+    const d = json.data;
+
+    // Isi form (tanpa tergantung mapPicker dulu)
+    document.getElementById('edit-id').value = d.id;
+    document.getElementById('form-title').innerHTML = `✏️ Edit: ${d.nama}`;
+    document.getElementById('btn-delete-form').style.display = 'inline-flex';
+    document.getElementById('f-nama').value = d.nama;
+    document.getElementById('f-jenis').value = d.jenis;
+    document.getElementById('f-badan').value = d.badan_usaha || '';
+    document.getElementById('f-provider').value = d.provider || '';
+    document.getElementById('f-alamat').value = d.alamat || '';
+    document.getElementById('f-kota').value = d.kota || 'KOTA MEDAN';
+    document.getElementById('f-status').value = d.status || 'Beroperasi';
+    document.getElementById('f-lat').value = d.latitude;
+    document.getElementById('f-lon').value = d.longitude;
+    document.getElementById('f-foto-url').value = d.foto_stasiun_url || '';
+
+    // Preview foto
+    const fotoPreview = document.getElementById('foto-preview');
+    if (d.foto_stasiun_url) {
+      fotoPreview.src = d.foto_stasiun_url;
+      fotoPreview.style.display = 'block';
+    } else {
+      fotoPreview.style.display = 'none';
+    }
+
+    // Trigger perubahan jenis (tampilkan unit/kabinet)
+    document.getElementById('f-jenis').dispatchEvent(new Event('change'));
+
+    // Set koordinat di peta (jika mapPicker sudah ada)
+    if (mapPicker) {
+      try {
+        mapPicker.flyTo([parseFloat(d.latitude), parseFloat(d.longitude)], 16);
+        setCoord(parseFloat(d.latitude), parseFloat(d.longitude));
+      } catch(e) { console.warn('Map error:', e); }
+    }
+
+    showToast('Data stasiun berhasil dimuat', 'success');
+  } catch (err) {
+    console.error('Edit error:', err);
+    showToast('❌ Gagal memuat data: ' + err.message, 'error');
+  }
+}
+
+// Delete from form
+document.getElementById('btn-delete-form').addEventListener('click', () => {
+  const id   = document.getElementById('edit-id').value;
+  const nama = document.getElementById('f-nama').value;
+  if (id) confirmDelete(parseInt(id), nama);
+});
+
+// ============================================================
+// DELETE CONFIRM MODAL
+// ============================================================
+function confirmDelete(id, nama) {
+  deleteTargetId = id;
+  document.getElementById('modal-msg').textContent = `Hapus stasiun "${nama}"? Tindakan ini tidak bisa dibatalkan.`;
+  document.getElementById('modal-confirm').classList.add('show');
+}
+
+function closeModal() {
+  document.getElementById('modal-confirm').classList.remove('show');
+  deleteTargetId = null;
+}
+
+document.getElementById('modal-confirm-btn').addEventListener('click', async () => {
+  if (!deleteTargetId) return;
+  const token = localStorage.getItem('ev_token');
+  try {
+    const res  = await fetch(`${API_BASE}/stasiun/${deleteTargetId}`, {
+      method: 'DELETE', headers: { Authorization: `Bearer ${token}` }
+    });
+    const json = await res.json();
+    if (json.success) {
+      showToast('✅ Stasiun berhasil dihapus', 'success');
+      closeModal();
+      history.replaceState(null, '', location.pathname);
+      switchPage('my-stasiun');
+    } else {
+      throw new Error(json.message || 'Gagal hapus');
+    }
+  } catch(err) {
+    showToast('❌ ' + err.message, 'error');
+    closeModal();
+  }
+});
+
+// Close modal on overlay click
+document.getElementById('modal-confirm').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal-confirm')) closeModal();
+});
+
+// ============================================================
+// TOAST
+// ============================================================
+function showToast(msg, type = 'success') {
+  const container = document.getElementById('toast-dash');
+  const div = document.createElement('div');
+  div.className = `toast-d ${type}`;
+  div.textContent = msg;
+  container.appendChild(div);
+  setTimeout(() => div.remove(), 3500);
+}
+
+// ============================================================
+// INIT
+// ============================================================
+initAuth();
+
+// Handle URL action params
+//const initParams = new URLSearchParams(location.search);
+//if (initParams.get('action') === 'add' || initParams.get('action') === 'edit') {
+  //switchPage('form-stasiun');
+//} else {
+  //loadOverview();
+//}
+
+const initParams = new URLSearchParams(location.search);
+const action = initParams.get('action');
+const editId = initParams.get('id');
+
+if (action === 'add') {
+  switchPage('form-stasiun');
+} else if (action === 'edit' && editId) {
+  switchPage('form-stasiun');
+  // Tunggu sebentar agar form selesai di-render, lalu muat data
+  setTimeout(() => {
+    loadEditForm(editId);
+  }, 200);
+} else {
+  loadOverview();
+}
+
+// Fungsi global untuk edit stasiun (dipanggil dari tombol)
+window.editStasiun = function(id) {
+  console.log('Edit stasiun dengan id:', id);
+  // Pindah ke halaman form
+  switchPage('form-stasiun');
+  // Tunggu sebentar agar form siap, lalu load data
+  setTimeout(() => {
+    loadEditForm(id);
+  }, 200);
+};
+</script>
+</body>
+</html>

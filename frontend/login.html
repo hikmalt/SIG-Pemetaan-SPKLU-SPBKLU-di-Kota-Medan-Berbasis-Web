@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<!-- FILE: frontend/login.html -->
+<!-- Halaman Login Google OAuth — SIG EV Station Medan -->
+<!-- Hikmal Akbar | 2305181024 -->
+<html lang="id">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Login — SIG EV Station Medan</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet"/>
+  <!-- Google Identity Services -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{--green:#22c55e;--dark:#0a0f1e;--dark2:#111827;--card:#1a2235;--text:#f1f5f9;--muted:#94a3b8;--border:rgba(255,255,255,0.08)}
+    body{font-family:'Inter',sans-serif;background:var(--dark);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+    .login-wrap{width:100%;max-width:420px}
+    .login-card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:40px 36px;text-align:center}
+    .login-logo{width:64px;height:64px;margin:0 auto 20px}
+    .login-logo svg{width:100%;height:100%}
+    .login-title{font-family:'Space Grotesk',sans-serif;font-size:1.6rem;font-weight:700;margin-bottom:8px}
+    .login-sub{color:var(--muted);font-size:0.85rem;margin-bottom:32px;line-height:1.6}
+    .login-info{background:rgba(34,197,94,0.07);border:1px solid rgba(34,197,94,0.15);border-radius:12px;padding:16px;font-size:0.8rem;color:var(--muted);line-height:1.6;text-align:left;margin-top:24px}
+    .login-info ul{padding-left:16px;margin-top:6px}
+    .login-info ul li{margin-bottom:4px}
+    .back-link{display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-size:0.82rem;text-decoration:none;margin-top:20px;transition:color 0.2s}
+    .back-link:hover{color:var(--green)}
+    /* Override Google button */
+    #g_id_signin>div{display:flex!important;justify-content:center!important}
+    .g-btn-wrap{display:flex;justify-content:center;margin:0 auto}
+  </style>
+</head>
+<body>
+<div class="login-wrap">
+  <a href="index.html" class="back-link" style="display:flex;margin-bottom:20px">
+    ← Kembali ke Beranda
+  </a>
+  <div class="login-card">
+    <div class="login-logo">
+      <svg viewBox="0 0 64 64" fill="none">
+        <circle cx="32" cy="32" r="28" stroke="#22c55e" stroke-width="3" stroke-dasharray="8 4"/>
+        <circle cx="32" cy="32" r="18" fill="rgba(34,197,94,0.1)"/>
+        <path d="M36 16L24 34h12L20 48l22-18h-12L36 16z" fill="#22c55e"/>
+      </svg>
+    </div>
+    <h1 class="login-title">Masuk ke EV Station</h1>
+    <p class="login-sub">Login dengan akun Google untuk mengelola<br>data stasiun pengisian kendaraan listrik.</p>
+
+    <!-- Google Sign In Button -->
+    <div class="g-btn-wrap">
+      <div id="g_id_onload"
+          data-client_id="773619176874-nmvf96u0ouivvpq1tnosf49dcbqfcmcj.apps.googleusercontent.com"
+          data-callback="handleGoogleCredential"
+          data-auto_prompt="false">
+      </div>
+      <div class="g_id_signin"
+           data-type="standard"
+           data-size="large"
+           data-theme="filled_black"
+           data-text="signin_with"
+           data-shape="pill"
+           data-logo_alignment="left">
+      </div>
+    </div>
+
+    <div class="login-info">
+      <strong style="color:var(--text)">ℹ️ Informasi Login</strong>
+      <ul>
+        <li>Login wajib untuk menambah/edit stasiun</li>
+        <li>Peta interaktif bisa diakses tanpa login</li>
+        <li>Admin: akses CRUD semua stasiun</li>
+        <li>User: kelola stasiun yang Anda upload</li>
+      </ul>
+    </div>
+  </div>
+
+  <p style="text-align:center;color:var(--muted);font-size:0.75rem;margin-top:16px">
+    Dengan login, Anda menyetujui penggunaan data untuk keperluan akademik SIG EV Station Medan
+  </p>
+</div>
+
+<script>
+// FILE: frontend/login.html (inline script)
+const API_BASE = 'http://localhost:3000/api';
+
+async function handleGoogleCredential(response) {
+  try {
+    const res  = await fetch(`${API_BASE}/auth/google`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ credential: response.credential })
+    });
+    const json = await res.json();
+    if (json.success && json.token) {
+      localStorage.setItem('ev_token', json.token);
+      localStorage.setItem('ev_user', JSON.stringify(json.user));
+      window.location.href = json.user.role === 'admin' ? 'dashboard.html' : 'map.html';
+    } else {
+      alert('Login gagal: ' + (json.message || 'Coba lagi'));
+    }
+  } catch(e) {
+    alert('Gagal konek ke server. Pastikan backend berjalan di localhost:3000');
+  }
+}
+
+// Redirect jika sudah login
+if (localStorage.getItem('ev_token')) {
+  try {
+    const payload = JSON.parse(atob(localStorage.getItem('ev_token').split('.')[1]));
+    if (payload.exp * 1000 > Date.now()) window.location.href = 'map.html';
+  } catch(_) { localStorage.removeItem('ev_token'); }
+}
+</script>
+</body>
+</html>

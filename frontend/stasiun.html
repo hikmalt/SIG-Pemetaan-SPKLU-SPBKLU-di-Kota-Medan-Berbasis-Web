@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<!-- FILE: frontend/stasiun.html -->
+<!-- Detail Stasiun — SIG EV Station Medan -->
+<!-- Hikmal Akbar | 2305181024 | Teknologi Rekayasa Perangkat Lunak -->
+<!-- VERSI 2 --!>
+
+<html lang="id">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Detail Stasiun — SIG EV Station Medan</title>
+  <meta name="description" content="Detail informasi stasiun pengisian kendaraan listrik di Kota Medan"/>
+
+  <!-- Leaflet CSS (untuk mini-map) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet"/>
+
+  <style>
+    /* ============================================================
+       RESET & VARIABLES
+    ============================================================ */
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --green:#22c55e;--green-d:#16a34a;
+      --blue:#3b82f6;--yellow:#facc15;--red:#ef4444;
+      --dark:#0a0f1e;--dark2:#111827;--dark3:#1f2937;
+      --card:#1a2235;--text:#f1f5f9;--muted:#94a3b8;
+      --border:rgba(255,255,255,0.08);
+      --radius:14px;
+      --ff:'Inter',sans-serif;--ff-h:'Space Grotesk',sans-serif;
+    }
+    html{scroll-behavior:smooth}
+    body{font-family:var(--ff);background:var(--dark);color:var(--text);min-height:100vh}
+    a{text-decoration:none;color:inherit}
+
+    /* ============================================================
+       NAVBAR
+    ============================================================ */
+    nav{
+      background:rgba(17,24,39,0.9);backdrop-filter:blur(16px);
+      padding:14px 5%;display:flex;align-items:center;justify-content:space-between;
+      border-bottom:1px solid var(--border);
+      position:sticky;top:0;z-index:100;gap:12px;
+    }
+    .nav-logo{
+      font-family:var(--ff-h);font-weight:700;font-size:1rem;color:var(--green);
+      display:flex;align-items:center;gap:8px;
+    }
+    .nav-breadcrumb{
+      display:flex;align-items:center;gap:6px;font-size:0.82rem;
+    }
+    .nav-breadcrumb a{color:var(--muted);transition:color 0.2s}
+    .nav-breadcrumb a:hover{color:var(--green)}
+    .nav-breadcrumb .sep{color:var(--border)}
+    .nav-breadcrumb .current{color:var(--text)}
+    .btn{
+      padding:8px 18px;border-radius:99px;font-size:0.82rem;font-weight:600;
+      border:none;display:inline-flex;align-items:center;gap:6px;
+      cursor:pointer;transition:transform 0.15s,opacity 0.15s;
+    }
+    .btn:hover{transform:scale(1.03);opacity:0.9}
+    .btn-green{background:var(--green);color:#000}
+    .btn-outline{background:none;border:1px solid var(--border);color:var(--muted)}
+    .btn-outline:hover{border-color:var(--green);color:var(--green)}
+    .btn-red{background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.2)}
+    .btn-red:hover{background:rgba(239,68,68,0.25)}
+
+    /* ============================================================
+       CONTAINER
+    ============================================================ */
+    .container{max-width:1000px;margin:0 auto;padding:32px 5%}
+
+    /* ============================================================
+       SKELETON
+    ============================================================ */
+    .skeleton{
+      background:linear-gradient(90deg,var(--dark3) 25%,var(--card) 50%,var(--dark3) 75%);
+      background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:8px;
+    }
+    @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+    /* ============================================================
+       HERO IMAGE
+    ============================================================ */
+    .hero-img-wrap{
+      position:relative;border-radius:var(--radius);overflow:hidden;
+      margin-bottom:28px;
+      background:var(--dark3);
+    }
+    .hero-img{
+      width:100%;height:340px;object-fit:cover;display:block;
+      transition:transform 0.4s;
+    }
+    .hero-img:hover{transform:scale(1.02)}
+    .hero-img-overlay{
+      position:absolute;bottom:0;left:0;right:0;
+      padding:24px 28px;
+      background:linear-gradient(transparent, rgba(0,0,0,0.75));
+    }
+    .hero-img-overlay h1{
+      font-family:var(--ff-h);
+      font-size:clamp(1.4rem,4vw,2rem);
+      font-weight:800;line-height:1.2;margin-bottom:8px;
+    }
+    .hero-img-overlay .addr{
+      font-size:0.88rem;color:rgba(255,255,255,0.75);
+      display:flex;align-items:center;gap:6px;
+    }
+
+    /* ============================================================
+       BADGES
+    ============================================================ */
+    .badge-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+    .badge{
+      display:inline-flex;align-items:center;gap:4px;
+      padding:4px 12px;border-radius:99px;font-size:0.74rem;font-weight:600;
+    }
+    .badge-spklu{background:rgba(34,197,94,0.15);color:var(--green);border:1px solid rgba(34,197,94,0.2)}
+    .badge-spbklu{background:rgba(59,130,246,0.15);color:var(--blue);border:1px solid rgba(59,130,246,0.2)}
+    .badge-ok{background:rgba(34,197,94,0.1);color:var(--green)}
+    .badge-warn{background:rgba(250,204,21,0.1);color:var(--yellow)}
+    .badge-err{background:rgba(239,68,68,0.1);color:var(--red)}
+    .badge-kec{background:rgba(99,102,241,0.1);color:#a5b4fc;border:1px solid rgba(99,102,241,0.2)}
+
+    /* ============================================================
+       ACTION BAR
+    ============================================================ */
+    .action-bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:32px}
+
+    /* ============================================================
+       INFO GRID
+    ============================================================ */
+    .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+    .info-card{
+      background:var(--card);border:1px solid var(--border);
+      border-radius:var(--radius);padding:20px;
+    }
+    .info-card h3{
+      font-size:0.72rem;font-weight:700;text-transform:uppercase;
+      letter-spacing:0.08em;color:var(--muted);margin-bottom:14px;
+    }
+    .info-row{
+      display:flex;justify-content:space-between;align-items:flex-start;
+      padding:8px 0;border-bottom:1px solid var(--border);
+      font-size:0.84rem;gap:16px;
+    }
+    .info-row:last-child{border-bottom:none}
+    .info-row .lbl{color:var(--muted);flex-shrink:0}
+    .info-row .val{font-weight:500;text-align:right;word-break:break-all}
+
+    /* ============================================================
+       MINI MAP
+    ============================================================ */
+    #mini-map{
+      width:100%;height:220px;border-radius:var(--radius);
+      border:1px solid var(--border);margin-top:14px;
+    }
+
+    /* ============================================================
+       UNIT PENGISIAN (SPKLU)
+    ============================================================ */
+    .section-title{
+      font-family:var(--ff-h);font-size:1.05rem;font-weight:700;
+      margin-bottom:16px;display:flex;align-items:center;gap:8px;
+    }
+    .unit-card{
+      background:var(--dark3);border:1px solid var(--border);
+      border-radius:12px;padding:20px;margin-bottom:14px;
+      transition:border-color 0.2s;
+    }
+    .unit-card:hover{border-color:rgba(34,197,94,0.3)}
+    .unit-header{
+      display:flex;align-items:center;justify-content:space-between;
+      margin-bottom:14px;flex-wrap:wrap;gap:8px;
+    }
+    .unit-header h4{font-size:0.9rem;font-weight:600}
+    .unit-header .tipe{
+      padding:4px 12px;border-radius:99px;font-size:0.72rem;font-weight:700;
+      background:rgba(34,197,94,0.12);color:var(--green);
+    }
+    .unit-stats{
+      display:flex;flex-wrap:wrap;gap:16px;
+      font-size:0.82rem;color:var(--muted);margin-bottom:14px;
+    }
+    .unit-stats span{display:flex;align-items:center;gap:4px}
+    .port-list{display:flex;flex-wrap:wrap;gap:6px}
+    .port-tag{
+      padding:4px 10px;border-radius:6px;font-size:0.72rem;font-weight:600;
+      border:1px solid var(--border);background:var(--card);
+      display:flex;align-items:center;gap:4px;
+    }
+    .port-tag.avail  {border-color:rgba(34,197,94,0.3);color:var(--green)}
+    .port-tag.used   {border-color:rgba(250,204,21,0.3);color:var(--yellow)}
+    .port-tag.broken {border-color:rgba(239,68,68,0.3);color:var(--red)}
+    .port-tag .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+    .port-tag.avail  .dot{background:var(--green)}
+    .port-tag.used   .dot{background:var(--yellow)}
+    .port-tag.broken .dot{background:var(--red)}
+
+    /* ============================================================
+       KABINET SWAP (SPBKLU)
+    ============================================================ */
+    .kabinet-card{
+      background:var(--dark3);border:1px solid var(--border);
+      border-radius:12px;padding:20px;margin-bottom:14px;
+      transition:border-color 0.2s;
+    }
+    .kabinet-card:hover{border-color:rgba(59,130,246,0.3)}
+    .kabinet-header{
+      display:flex;align-items:center;justify-content:space-between;
+      margin-bottom:14px;flex-wrap:wrap;gap:8px;
+    }
+    .kabinet-header h4{font-size:0.9rem;font-weight:600}
+    .kapasitas-badge{
+      padding:4px 12px;border-radius:99px;font-size:0.72rem;font-weight:700;
+      background:rgba(59,130,246,0.12);color:var(--blue);
+    }
+    .baterai-grid{
+      display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;
+    }
+    .baterai-slot{
+      background:var(--card);border:1px solid var(--border);border-radius:8px;
+      padding:10px;font-size:0.75rem;
+    }
+    .baterai-slot .level{
+      font-family:var(--ff-h);font-size:1.2rem;font-weight:700;
+      margin-bottom:2px;
+    }
+    .baterai-slot .level.full{color:var(--green)}
+    .baterai-slot .level.mid {color:var(--yellow)}
+    .baterai-slot .level.low {color:var(--red)}
+    .baterai-slot .bat-info{color:var(--muted);line-height:1.5}
+    .baterai-slot .avail{color:var(--green);font-weight:600}
+    .baterai-slot .used {color:var(--yellow);font-weight:600}
+
+    /* ============================================================
+       NEARBY STASIUN
+    ============================================================ */
+    .nearby-grid{
+      display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+      gap:12px;margin-top:0;
+    }
+    .nearby-item{
+      background:var(--card);border:1px solid var(--border);
+      border-radius:10px;padding:14px;cursor:pointer;
+      transition:border-color 0.2s,transform 0.15s;
+      display:flex;align-items:center;gap:12px;
+    }
+    .nearby-item:hover{border-color:rgba(34,197,94,0.3);transform:translateY(-2px)}
+    .nearby-icon{
+      width:40px;height:40px;border-radius:10px;
+      display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;
+    }
+    .nearby-item .info h4{font-size:0.82rem;font-weight:600;margin-bottom:2px}
+    .nearby-item .info p{font-size:0.72rem;color:var(--muted)}
+    .nearby-item .jarak{
+      margin-left:auto;font-size:0.72rem;color:var(--green);
+      white-space:nowrap;flex-shrink:0;font-weight:600;
+    }
+
+    /* ============================================================
+       TOAST
+    ============================================================ */
+    #toast{
+      position:fixed;bottom:24px;right:24px;z-index:2000;
+      display:flex;flex-direction:column;gap:8px;
+    }
+    .toast-item{
+      padding:12px 18px;background:var(--card);border:1px solid var(--border);
+      border-radius:10px;font-size:0.82rem;min-width:240px;
+      animation:slide-in 0.3s ease;box-shadow:0 8px 24px rgba(0,0,0,0.3);
+    }
+    .toast-item.success{border-color:rgba(34,197,94,0.3)}
+    .toast-item.error  {border-color:rgba(239,68,68,0.3)}
+    @keyframes slide-in{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+
+    /* ============================================================
+       EMPTY STATE
+    ============================================================ */
+    .empty-state{
+      text-align:center;padding:40px;color:var(--muted);
+    }
+    .empty-state .emoji{font-size:2.5rem;margin-bottom:12px}
+
+    /* ============================================================
+       RESPONSIVE
+    ============================================================ */
+    @media(max-width:640px){
+      .info-grid{grid-template-columns:1fr}
+      .hero-img{height:220px}
+      .action-bar{flex-direction:column}
+      .action-bar .btn{justify-content:center}
+    }
+  </style>
+</head>
+<body>
+
+<!-- ============================================================
+     NAVBAR
+============================================================ -->
+<nav>
+  <a href="index.html" class="nav-logo">
+    <svg width="24" height="24" viewBox="0 0 32 32" fill="none">
+      <circle cx="16" cy="16" r="14" stroke="#22c55e" stroke-width="2"/>
+      <path d="M18 7L10 17h8L8 25l14-11h-8L18 7z" fill="#22c55e"/>
+    </svg>
+    EV Station Medan
+  </a>
+
+  <div class="nav-breadcrumb">
+    <a href="index.html">Beranda</a>
+    <span class="sep">/</span>
+    <a href="map.html">Peta</a>
+    <span class="sep">/</span>
+    <span class="current" id="nav-nama">Detail Stasiun</span>
+  </div>
+
+  <a href="map.html" class="btn btn-outline" style="flex-shrink:0">🗺️ Peta</a>
+</nav>
+
+<!-- ============================================================
+     MAIN CONTAINER
+============================================================ -->
+<div class="container">
+
+  <!-- SKELETON saat loading -->
+  <div id="skeleton-wrap">
+    <div class="skeleton" style="width:100%;height:340px;margin-bottom:28px;border-radius:14px"></div>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <div class="skeleton" style="width:80px;height:26px"></div>
+      <div class="skeleton" style="width:90px;height:26px"></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:28px">
+      <div class="skeleton" style="width:160px;height:38px;border-radius:99px"></div>
+      <div class="skeleton" style="width:120px;height:38px;border-radius:99px"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div class="skeleton" style="height:200px;border-radius:14px"></div>
+      <div class="skeleton" style="height:200px;border-radius:14px"></div>
+    </div>
+  </div>
+
+  <!-- KONTEN UTAMA (disembunyikan saat loading) -->
+  <div id="content" style="display:none">
+
+    <!-- Hero image + overlay nama -->
+    <div class="hero-img-wrap">
+      <img id="foto" class="hero-img" src="" alt=""
+           onerror="this.src='https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1000&h=340&fit=crop'"/>
+      <div class="hero-img-overlay">
+        <h1 id="nama-overlay"></h1>
+        <p class="addr">📍 <span id="alamat-overlay"></span></p>
+      </div>
+    </div>
+
+    <!-- Badges -->
+    <div class="badge-row">
+      <span id="badge-jenis"    class="badge"></span>
+      <span id="badge-status"   class="badge"></span>
+      <span id="badge-kecamatan" class="badge badge-kec" style="display:none"></span>
+    </div>
+
+    <!-- Action bar -->
+    <div class="action-bar">
+      <a id="btn-nav" href="#" target="_blank" rel="noopener" class="btn btn-green">
+        🗺️ Navigasi ke Sini
+      </a>
+      <a href="map.html" class="btn btn-outline">📍 Lihat di Peta</a>
+      <button id="btn-edit"   class="btn btn-outline" style="display:none">✏️ Edit Stasiun</button>
+      <button id="btn-delete" class="btn btn-red"     style="display:none">🗑️ Hapus Stasiun</button>
+    </div>
+
+    <!-- Info grid -->
+    <div class="info-grid">
+
+      <!-- Kolom kiri: info umum -->
+      <div class="info-card">
+        <h3>Informasi Umum</h3>
+        <div class="info-row"><span class="lbl">Jenis</span><span class="val" id="i-jenis"></span></div>
+        <div class="info-row"><span class="lbl">Badan Usaha</span><span class="val" id="i-badan"></span></div>
+        <div class="info-row"><span class="lbl">Provider / App</span><span class="val" id="i-provider"></span></div>
+        <div class="info-row"><span class="lbl">Kota</span><span class="val" id="i-kota"></span></div>
+        <div class="info-row"><span class="lbl">Kecamatan</span><span class="val" id="i-kecamatan"></span></div>
+        <div class="info-row"><span class="lbl">Status</span><span class="val" id="i-status"></span></div>
+        <div class="info-row"><span class="lbl">Ditambahkan</span><span class="val" id="i-tanggal"></span></div>
+      </div>
+
+      <!-- Kolom kanan: lokasi + mini map -->
+      <div class="info-card">
+        <h3>Lokasi & Koordinat</h3>
+        <div class="info-row"><span class="lbl">Latitude</span><span class="val" id="i-lat" style="color:var(--green);font-family:monospace"></span></div>
+        <div class="info-row"><span class="lbl">Longitude</span><span class="val" id="i-lon" style="color:var(--green);font-family:monospace"></span></div>
+        <div class="info-row"><span class="lbl">SRID</span><span class="val" style="font-family:monospace">WGS84 (4326)</span></div>
+        <div class="info-row">
+          <span class="lbl">Geom</span>
+          <span class="val" id="i-geom" style="font-family:monospace;font-size:0.72rem;color:var(--muted)"></span>
+        </div>
+        <!-- Mini map Leaflet -->
+        <div id="mini-map"></div>
+      </div>
+
+    </div><!-- end info-grid -->
+
+    <!-- ======================================================
+         UNIT PENGISIAN (hanya tampil untuk SPKLU)
+    ====================================================== -->
+    <div id="section-spklu" style="display:none;margin-bottom:32px">
+      <div class="section-title">⚡ Unit Pengisian Daya</div>
+      <div id="unit-list"></div>
+    </div>
+
+    <!-- ======================================================
+         KABINET SWAP (hanya tampil untuk SPBKLU)
+    ====================================================== -->
+    <div id="section-spbklu" style="display:none;margin-bottom:32px">
+      <div class="section-title">🔋 Kabinet Swap Baterai</div>
+      <div id="kabinet-list"></div>
+    </div>
+
+    <!-- ======================================================
+         STASIUN TERDEKAT
+    ====================================================== -->
+    <div id="section-nearby" style="margin-bottom:40px">
+      <div class="section-title">📍 Stasiun Lain Terdekat</div>
+      <div id="nearby-list">
+        <div style="display:flex;gap:10px">
+          <div class="skeleton" style="height:64px;flex:1;border-radius:10px"></div>
+          <div class="skeleton" style="height:64px;flex:1;border-radius:10px"></div>
+          <div class="skeleton" style="height:64px;flex:1;border-radius:10px"></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end #content -->
+
+</div><!-- end .container -->
+
+<!-- Toast container -->
+<div id="toast"></div>
+
+<!-- Leaflet JS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+
+<script>
+// ============================================================
+// FILE: frontend/stasiun.html (inline script)
+// Detail Stasiun — SIG EV Station Medan
+// Hikmal Akbar | 2305181024
+// ============================================================
+
+const API_BASE = 'http://localhost:3000/api';
+
+// Ambil ID dari URL query param
+const stasiunId = new URLSearchParams(location.search).get('id');
+
+// Redirect jika tidak ada ID
+if (!stasiunId) {
+  document.body.innerHTML = `
+    <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;font-family:'Inter',sans-serif;background:#0a0f1e;color:#94a3b8">
+      <div style="font-size:3rem">❌</div>
+      <h2 style="color:#f1f5f9">ID stasiun tidak ditemukan</h2>
+      <a href="map.html" style="color:#22c55e;font-size:0.9rem">← Kembali ke Peta</a>
+    </div>`;
+}
+
+// ============================================================
+// LOAD DETAIL STASIUN
+// ============================================================
+async function loadDetail() {
+  try {
+    const res = await fetch(`${API_BASE}/stasiun/${stasiunId}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message);
+    renderDetail(json.data);
+    loadNearby(json.data.latitude, json.data.longitude, json.data.id);
+  } catch (err) {
+    console.error(err);
+    document.getElementById('skeleton-wrap').innerHTML = `
+      <div style="text-align:center;padding:80px">
+        <div style="font-size:3rem">⚠️</div>
+        <h2>Gagal memuat data stasiun</h2>
+        <p>${err.message}</p>
+        <p>Pastikan backend berjalan di ${API_BASE}</p>
+        <a href="map.html">← Kembali ke Peta</a>
+      </div>`;
+  }
+}
+
+// ============================================================
+// RENDER DETAIL
+// ============================================================
+function renderDetail(d) {
+  // Sembunyikan skeleton, tampilkan konten
+  document.getElementById('skeleton-wrap').style.display = 'none';
+  document.getElementById('content').style.display = 'block';
+
+  // Update tab title & breadcrumb
+  document.title = `${d.nama} — SIG EV Station Medan`;
+  document.getElementById('nav-nama').textContent = d.nama;
+
+  // Hero image
+  const foto = document.getElementById('foto');
+  foto.src = d.foto_stasiun_url || '';
+  foto.alt = d.nama;
+  document.getElementById('nama-overlay').textContent = d.nama;
+  document.getElementById('alamat-overlay').textContent = d.alamat || 'Kota Medan';
+
+  // Badges
+  const jenisLower = (d.jenis || '').toLowerCase();
+  const badgeJenis = document.getElementById('badge-jenis');
+  badgeJenis.className = `badge badge-${jenisLower}`;
+  badgeJenis.textContent = d.jenis;
+
+  const badgeStatus = document.getElementById('badge-status');
+  if (d.status === 'Beroperasi') {
+    badgeStatus.className = 'badge badge-ok';
+    badgeStatus.textContent = '🟢 Beroperasi';
+  } else if (d.status === 'Maintenance') {
+    badgeStatus.className = 'badge badge-warn';
+    badgeStatus.textContent = '🟡 Maintenance';
+  } else {
+    badgeStatus.className = 'badge badge-err';
+    badgeStatus.textContent = '🔴 Tidak Beroperasi';
+  }
+
+  if (d.kecamatan) {
+    const badgeKec = document.getElementById('badge-kecamatan');
+    badgeKec.textContent = '🏘️ ' + d.kecamatan;
+    badgeKec.style.display = 'inline-flex';
+  }
+
+  // Tombol navigasi Google Maps
+  document.getElementById('btn-nav').href =
+    `https://www.google.com/maps/dir/?api=1&destination=${d.latitude},${d.longitude}`;
+
+  // Info umum
+  document.getElementById('i-jenis').textContent     = d.jenis || '-';
+  document.getElementById('i-badan').textContent     = d.badan_usaha || '-';
+  document.getElementById('i-provider').textContent  = d.provider || '-';
+  document.getElementById('i-kota').textContent      = d.kota || 'Kota Medan';
+  document.getElementById('i-kecamatan').textContent = d.kecamatan || '-';
+  document.getElementById('i-status').textContent    = d.status || 'Beroperasi';
+  document.getElementById('i-tanggal').textContent   = d.created_at
+    ? new Date(d.created_at).toLocaleDateString('id-ID', { day:'numeric', month:'long', year:'numeric' })
+    : '-';
+
+  // Koordinat
+  const lat = parseFloat(d.latitude);
+  const lon = parseFloat(d.longitude);
+  document.getElementById('i-lat').textContent  = lat.toFixed(7);
+  document.getElementById('i-lon').textContent  = lon.toFixed(7);
+  document.getElementById('i-geom').textContent = `POINT(${lon.toFixed(4)} ${lat.toFixed(4)})`;
+
+  // Auth: tampilkan edit/hapus jika pemilik atau admin
+  const token = localStorage.getItem('ev_token');
+  if (token) {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      if (payload.exp * 1000 > Date.now()) {
+        if (payload.role === 'admin' || payload.id === d.created_by) {
+          document.getElementById('btn-edit').style.display   = 'inline-flex';
+          document.getElementById('btn-delete').style.display = 'inline-flex';
+        }
+      }
+    } catch (_) {}
+  }
+
+  // Tombol edit
+  document.getElementById('btn-edit').addEventListener('click', () => {
+    window.location.href = `dashboard.html?action=edit&id=${d.id}`;
+  });
+
+  // Tombol hapus
+  document.getElementById('btn-delete').addEventListener('click', () => confirmDelete(d.id, d.nama));
+
+  // Mini map Leaflet
+  initMiniMap(lat, lon, d.nama, d.jenis);
+
+  // Render unit atau kabinet sesuai jenis
+  if (d.jenis === 'SPKLU' && d.units && d.units.length > 0) {
+    renderUnits(d.units);
+  }
+  if (d.jenis === 'SPBKLU' && d.kabinetSwap && d.kabinetSwap.length > 0) {
+    renderKabinets(d.kabinetSwap);
+  }
+}
+
+// ============================================================
+// MINI MAP (Leaflet)
+// ============================================================
+function initMiniMap(lat, lon, nama, jenis) {
+  const miniMap = L.map('mini-map', {
+    center: [lat, lon], zoom: 15,
+    zoomControl: false,
+    attributionControl: false,
+    dragging: false,
+    scrollWheelZoom: false,
+    doubleClickZoom: false,
+  });
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19
+  }).addTo(miniMap);
+
+  const color = jenis === 'SPKLU' ? '#22c55e' : '#3b82f6';
+  L.marker([lat, lon], {
+    icon: L.divIcon({
+      className: '',
+      iconSize: [32, 40], iconAnchor: [16, 40],
+      html: `<svg width="32" height="40" viewBox="0 0 32 40" fill="none">
+        <path d="M16 0C7.16 0 0 7.16 0 16c0 12 16 24 16 24s16-12 16-24C32 7.16 24.84 0 16 0z" fill="${color}"/>
+        <circle cx="16" cy="16" r="8" fill="rgba(0,0,0,0.2)"/>
+        <text x="16" y="20" text-anchor="middle" font-size="10" fill="white">${jenis === 'SPKLU' ? '⚡' : '🔋'}</text>
+      </svg>`
+    })
+  }).addTo(miniMap).bindPopup(nama).openPopup();
+}
+
+// ============================================================
+// RENDER UNIT PENGISIAN (SPKLU)
+// ============================================================
+function renderUnits(units) {
+  document.getElementById('section-spklu').style.display = 'block';
+  document.getElementById('unit-list').innerHTML = units.map(u => {
+    const ports = (u.ports || []).map(p => {
+      const cls = p.status_port === 'Tersedia' ? 'avail'
+                : p.status_port === 'Digunakan' ? 'used' : 'broken';
+      return `<span class="port-tag ${cls}">
+        <span class="dot"></span>
+        ${p.jenis_port}
+        <span style="opacity:0.6;font-weight:400">· ${p.status_port}</span>
+      </span>`;
+    }).join('');
+
+    return `
+      <div class="unit-card">
+        <div class="unit-header">
+          <h4>${u.nama_unit || 'Unit Charger'}
+            ${u.nomor_identitas ? `<span style="color:var(--muted);font-weight:400;font-size:0.78rem"> — #${u.nomor_identitas}</span>` : ''}
+          </h4>
+          <span class="tipe">${u.tipe_charger || 'Charger'}</span>
+        </div>
+        <div class="unit-stats">
+          <span>⚡ ${u.daya_min_kw || 0}–${u.daya_max_kw || 0} kW</span>
+          <span>💰 ${u.harga_per_kwh || '-'}/kWh</span>
+          ${u.biaya_layanan ? `<span>🏷️ Layanan: ${u.biaya_layanan}</span>` : ''}
+        </div>
+        ${ports ? `<div>
+          <div style="font-size:0.72rem;color:var(--muted);margin-bottom:6px;font-weight:600">Konektor Tersedia</div>
+          <div class="port-list">${ports}</div>
+        </div>` : '<div style="font-size:0.78rem;color:var(--muted)">Tidak ada data port</div>'}
+      </div>`;
+  }).join('');
+}
+
+// ============================================================
+// RENDER KABINET SWAP (SPBKLU)
+// ============================================================
+function renderKabinets(kabinets) {
+  document.getElementById('section-spbklu').style.display = 'block';
+  document.getElementById('kabinet-list').innerHTML = kabinets.map(k => {
+    const tersedia = (k.baterai || []).filter(b => b.ketersediaan === 'Tersedia').length;
+    const total    = k.kapasitas_baterai || (k.baterai || []).length;
+
+    const bateraiSlots = (k.baterai || []).map(b => {
+      const lv   = parseInt(b.level_persen) || 0;
+      const lvCls = lv >= 80 ? 'full' : lv >= 30 ? 'mid' : 'low';
+      const avail = b.ketersediaan === 'Tersedia';
+      return `
+        <div class="baterai-slot">
+          <div class="level ${lvCls}">${lv}%</div>
+          <div class="bat-info">
+            ${b.kapasitas_ah || '-'} · ${b.jenis_sel || '-'}<br>
+            <span class="${avail ? 'avail' : 'used'}">${b.ketersediaan || '-'}</span>
+          </div>
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="kabinet-card">
+        <div class="kabinet-header">
+          <h4>${k.nama_kabinet || 'Kabinet Swap'}</h4>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span style="font-size:0.78rem;color:var(--green);font-weight:600">${tersedia}/${total} tersedia</span>
+            <span class="kapasitas-badge">${total} slot</span>
+          </div>
+        </div>
+        <div style="font-size:0.82rem;color:var(--muted);margin-bottom:14px">
+          💰 Harga penukaran: <strong style="color:var(--text)">${k.harga_penukaran || '-'}</strong>
+        </div>
+        ${bateraiSlots
+          ? `<div>
+              <div style="font-size:0.72rem;color:var(--muted);margin-bottom:8px;font-weight:600">Status Baterai</div>
+              <div class="baterai-grid">${bateraiSlots}</div>
+             </div>`
+          : '<div style="font-size:0.78rem;color:var(--muted)">Data baterai belum tersedia</div>'}
+      </div>`;
+  }).join('');
+}
+
+// ============================================================
+// LOAD NEARBY (Nearest Neighbor)
+// ============================================================
+async function loadNearby(lat, lon, excludeId) {
+  try {
+    const res  = await fetch(`${API_BASE}/stasiun/nearby?lat=${lat}&lon=${lon}&limit=6`);
+    const json = await res.json();
+    const data = (json.data || []).filter(s => s.id !== parseInt(excludeId)).slice(0, 4);
+
+    if (!data.length) {
+      document.getElementById('nearby-list').innerHTML =
+        '<div class="empty-state"><div class="emoji">📭</div><p>Tidak ada stasiun lain di sekitar sini.</p></div>';
+      return;
+    }
+
+    document.getElementById('nearby-list').innerHTML =
+      `<div class="nearby-grid">${data.map(s => {
+        const isSpklu = s.jenis === 'SPKLU';
+        const jarak   = s.jarak_meter >= 1000
+          ? `${(s.jarak_meter/1000).toFixed(1)} km`
+          : `${Math.round(s.jarak_meter)} m`;
+        return `
+          <div class="nearby-item" onclick="window.location.href='stasiun.html?id=${s.id}'">
+            <div class="nearby-icon" style="background:${isSpklu ? 'rgba(34,197,94,0.12)' : 'rgba(59,130,246,0.12)'}">
+              ${isSpklu ? '⚡' : '🔋'}
+            </div>
+            <div class="info">
+              <h4>${s.nama}</h4>
+              <p>${s.provider || s.badan_usaha || s.jenis}</p>
+            </div>
+            <span class="jarak">${jarak}</span>
+          </div>`;
+      }).join('')}</div>`;
+  } catch (_) {
+    document.getElementById('nearby-list').innerHTML =
+      '<div style="color:var(--muted);font-size:0.82rem">Gagal memuat stasiun terdekat.</div>';
+  }
+}
+
+// ============================================================
+// CONFIRM DELETE
+// ============================================================
+function confirmDelete(id, nama) {
+  if (!confirm(`Hapus stasiun "${nama}"?\n\nTindakan ini tidak dapat dibatalkan.`)) return;
+  doDelete(id);
+}
+
+async function doDelete(id) {
+  const token = localStorage.getItem('ev_token');
+  if (!token) { showToast('Silakan login terlebih dahulu', 'error'); return; }
+  try {
+    const res  = await fetch(`${API_BASE}/stasiun/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const json = await res.json();
+    if (json.success) {
+      showToast('✅ Stasiun berhasil dihapus', 'success');
+      setTimeout(() => window.location.href = 'map.html', 1200);
+    } else {
+      throw new Error(json.message || 'Gagal menghapus');
+    }
+  } catch (err) {
+    showToast('❌ ' + err.message, 'error');
+  }
+}
+
+// ============================================================
+// TOAST
+// ============================================================
+function showToast(msg, type = 'success') {
+  const container = document.getElementById('toast');
+  const div = document.createElement('div');
+  div.className = `toast-item ${type}`;
+  div.textContent = msg;
+  container.appendChild(div);
+  setTimeout(() => div.remove(), 3500);
+}
+
+// ============================================================
+// INIT
+// ============================================================
+if (stasiunId) loadDetail();
+</script>
+</body>
+</html>
