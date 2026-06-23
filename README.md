@@ -205,4 +205,4 @@ Politeknik Negeri Medan
 
 ## 📝 Lisensi
 
-Proyek ini dibuat untuk keperluan akademik — Tugas Akhir Praktikum SIG Semester Genap 2024.
+Proyek ini dibuat untuk keperluan akademik — Tugas Akhir Praktikum SIG Semester Genap 2025.
