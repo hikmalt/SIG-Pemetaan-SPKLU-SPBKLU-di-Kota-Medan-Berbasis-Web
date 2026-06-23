@@ -1,8 +1,6 @@
-# ============================================================
 # FILE: README.md
 # SIG EV Station Medan — Dokumentasi Proyek
 # Hikmal Akbar | 2305181024 | Teknologi Rekayasa Perangkat Lunak
-# ============================================================
 
 # ⚡ SIG EV Station Medan
 
@@ -205,4 +203,4 @@ Politeknik Negeri Medan
 
 ## 📝 Lisensi
 
-Proyek ini dibuat untuk keperluan akademik — Tugas Akhir Praktikum SIG Semester Genap 2025.
+Proyek ini dibuat untuk keperluan akademik — Tugas Akhir Praktikum SIG Semester Genap 2026.
